@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ES Shop - Login</title>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #F5F5F5; color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
+
+    .login-container {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+      width: 100%;
+      max-width: 350px;
+    }
+
+    .login-container h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #0B3D2E;
+    }
+
+    .login-container input[type="email"],
+    .login-container input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      outline: none;
+    }
+
+    .login-container label {
+      font-size: 12px;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .login-container .checkbox-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      font-size: 12px;
+    }
+
+    .login-container .checkbox-group input {
+      margin-right: 8px;
+    }
+
+    .login-container button {
+      width: 100%;
+      padding: 12px;
+      background: #0B3D2E;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .login-container button:active {
+      transform: scale(0.97);
+    }
+
+    .login-container .signup-link {
+      display: block;
+      text-align: center;
+      margin-top: 15px;
+      font-size: 12px;
+      color: #0B3D2E;
+      text-decoration: none;
+    }
+
+    .login-container .signup-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <h2>Connexion</h2>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="exemple@email.com" required>
+
+      <label for="password">Mot de passe</label>
+      <input type="password" id="password" placeholder="Votre mot de passe" required>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="rememberMe">
+        <label for="rememberMe">Rester connecté</label>
+      </div>
+
+      <button type="submit">Se connecter</button>
+    </form>
+    <a class="signup-link" href="signup.html">Créer un compte</a>
+  </div>
+<script type="module" src="js/login.js"></script>
+</body>
+</html>

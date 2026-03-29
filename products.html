@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ES Shop - Produits</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family: Arial,sans-serif;}
+  body { background:#F5F5F5; color:#111; }
+
+  header {
+    background:#0B3D2E; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center;
+  }
+  header h3 { font-size:18px; }
+  header .status { font-size:12px; color:#D4AF37; }
+
+  .container { padding:15px; }
+
+  table {
+    width:100%; border-collapse: collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 3px 8px rgba(0,0,0,0.08);
+  }
+
+  th, td {
+    padding:12px; text-align:left; font-size:14px;
+    border-bottom:1px solid #eee;
+  }
+
+  th { background:#0B3D2E; color:white; }
+
+  tr:hover { background:#f0f8ff; }
+
+  .stock-ok { color:green; font-weight:bold; }
+  .stock-low { color:red; font-weight:bold; }
+
+  .btn {
+    padding:6px 10px; border:none; border-radius:8px; cursor:pointer; font-size:13px; margin-right:5px;
+  }
+
+  .btn-add { background:#0B3D2E; color:white; }
+  .btn-edit { background:#D4AF37; color:white; }
+  .btn-delete { background:#C0392B; color:white; }
+
+  .add-product {
+    margin-bottom:10px; display:flex; justify-content:flex-end;
+  }
+
+  .add-product button { background:#0B3D2E; color:white; padding:10px 16px; border:none; border-radius:10px; cursor:pointer; }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #111;
+    display: flex;
+    
+    padding: 5px 0;
+    color: white;
+    z-index: 1000;
+  }
+
+  nav div {
+    text-align: center;
+    font-size: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  nav div:hover,
+  nav div.active { color: #D4AF37; font-weight: bold; }
+  .auth-links {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin: 50px 0;
+}
+
+.auth-links .btn {
+  padding: 12px 25px;
+  text-decoration: none;
+  background: #40739e;
+  color: #fff;
+  border-radius: 8px;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.auth-links .btn:hover {
+  background: #2f3640;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h3>ES Shop - Produits</h3>
+  <div class="status">● Online</div>
+</header>
+<div class="auth-links">
+  <a href="login.html" class="btn">Connexion</a>
+  <a href="signup.html" class="btn">Inscription</a>
+</div>
+<div class="container">
+
+  <div class="add-product">
+    <button class="btn-add">+ Ajouter Produit</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Prix Vente</th>
+        <th>Stock</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="products-table">
+      <!-- Produits injectés dynamiquement par products.js -->
+    </tbody>
+  </table>
+
+</div>
+
+<!-- NAVIGATION GLOBALE -->
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item active" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
+  <div class="nav-item" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<script type="module" src="js/products.js"></script>
+<script src="js/nav.js"></script>
+</body>
+</html>

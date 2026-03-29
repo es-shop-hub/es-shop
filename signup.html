@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ES Shop - Signup</title>
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif; }
+    body { background: #F5F5F5; color:#111; }
+
+    header {
+      background: #0B3D2E;
+      color: white;
+      padding: 12px;
+      text-align: center;
+    }
+
+    main {
+      max-width: 400px;
+      margin: 50px auto 120px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    main h2 {
+      margin-bottom: 20px;
+      text-align: center;
+      color: #0B3D2E;
+    }
+
+    form label {
+      display: block;
+      font-size: 14px;
+      margin: 10px 0 5px;
+    }
+
+    form input, form select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    form input:focus, form select:focus {
+      outline: none;
+      border-color: #0B3D2E;
+      box-shadow: 0 0 5px rgba(11,61,46,0.3);
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .checkbox-group input {
+      margin-right: 8px;
+    }
+
+    .signup-btn {
+      width: 100%;
+      padding: 12px;
+      background: #0B3D2E;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .signup-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: #111;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 0;
+      color: white;
+      z-index: 1000;
+    }
+
+    nav div {
+      text-align: center;
+      font-size: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    nav div:hover { color: #D4AF37; }
+    nav div.active { color: #D4AF37; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h3>ES Shop - Signup</h3>
+  </header>
+
+  <main>
+    <h2>Créer un nouvel utilisateur</h2>
+
+    <form id="signupForm">
+      <label for="fullName">Nom complet</label>
+      <input type="text" id="fullName" required>
+
+      <label for="email">Email</label>
+      <input type="email" id="email" required>
+
+      <label for="password">Mot de passe</label>
+      <input type="password" id="password" required>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="isActive" checked>
+        <label for="isActive">Activer le compte</label>
+      </div>
+
+      <button type="submit" class="signup-btn">Créer utilisateur</button>
+    </form>
+  </main>
+
+  <!-- NAVIGATION GLOBALE -->
+  <nav>
+    <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+    <div class="nav-item" data-page="products.html">📦 Produits</div>
+    <div class="nav-item" data-page="stats.html">📊 Stats</div>
+    <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
+    <div class="nav-item" data-page="purchases.html">📥 Achats</div>
+    <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+  </nav>
+
+  <script src="js/nav.js"></script>
+  <script type="module" src="js/signup.js"></script>
+</body>
+</html>

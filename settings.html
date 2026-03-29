@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paramètres Système</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f6fa; color:#2f3640; }
+  header { background:#192a56; color:#fff; padding:20px; text-align:center; }
+  h1,h2,h3 { margin:0 0 10px 0; }
+  main { padding:20px; max-width:1200px; margin:auto; }
+
+  section { background:#fff; padding:20px; margin-bottom:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th, td { padding:10px; border:1px solid #dcdde1; text-align:left; }
+  th { background:#40739e; color:#fff; }
+  tr:nth-child(even) { background:#f1f2f6; }
+
+  button { background:#40739e; color:#fff; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; transition:0.2s; }
+  button:hover { background:#2f3640; }
+
+  label { display:block; margin:10px 0; font-weight:500; }
+  input[type="checkbox"] { margin-right:10px; transform:scale(1.2); }
+
+  /* Modal ajout utilisateur */
+  #addUserModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; }
+  #addUserModal .modal-content { background:#fff; padding:20px; border-radius:10px; width:300px; text-align:left; }
+  #addUserModal input, #addUserModal select { width:100%; padding:8px; margin:5px 0 15px 0; border-radius:5px; border:1px solid #dcdde1; }
+
+  /* NAVIGATION BOTTOM */
+  nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #111;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    color: white;
+    z-index: 1000;
+  }
+  nav div { text-align: center; font-size: 12px; cursor: pointer; transition:0.2s; }
+  nav div:hover, nav div.active { color:#D4AF37; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Paramètres Système</h1>
+</header>
+
+<main>
+  <!-- Gestion utilisateurs -->
+  <section id="usersSection">
+    <h2>Gestion des utilisateurs</h2>
+    <table id="usersTable">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Email</th>
+          <th>Rôle</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rempli via JS -->
+      </tbody>
+    </table>
+    <button id="addUserBtn">Ajouter un utilisateur</button>
+  </section>
+
+  <!-- Configuration alertes & lock système -->
+  <section id="systemConfig">
+    <h2>Configuration système</h2>
+    <label>
+      <input type="checkbox" id="alertsToggle">
+      Activer alertes critiques
+    </label>
+    <label>
+      <input type="checkbox" id="systemLockToggle">
+      Verrouiller le système
+    </label>
+  </section>
+</main>
+
+<!-- Modal ajout utilisateur -->
+<div id="addUserModal">
+  <div class="modal-content">
+    <h3>Ajouter un utilisateur</h3>
+    <label>Nom</label>
+    <input type="text" id="newUserName">
+    <label>Email</label>
+    <input type="email" id="newUserEmail">
+    <label>Rôle</label>
+    <select id="newUserRole">
+      <option value="admin">Admin</option>
+      <option value="seller">Seller</option>
+    </select>
+    <button id="saveUserBtn">Enregistrer</button>
+    <button id="cancelUserBtn" style="background:#e84118;">Annuler</button>
+  </div>
+</div>
+
+<!-- NAVIGATION GLOBALE -->
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item active" data-page="settings.html">⚙️ Paramètres</div>
+  <div class="nav-item" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<!-- Scripts -->
+<script type="module" src="js/settings.js"></script>
+<script>
+  // NAVIGATION JS
+  document.querySelectorAll('nav .nav-item').forEach(item => {
+    if (item.dataset.page === location.pathname.split('/').pop()) item.classList.add('active');
+    item.addEventListener('click', () => location.href = item.dataset.page);
+  });
+</script>
+
+</body>
+</html>

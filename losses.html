@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signalement Pertes / Erreurs</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f6fa; color:#2f3640; }
+  header { background:#e84118; color:#fff; padding:20px; text-align:center; }
+  main { padding:20px; max-width:800px; margin:auto; }
+  section { background:#fff; padding:20px; margin-bottom:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+  h1, h2 { margin:0 0 10px 0; }
+  form label { display:block; margin:10px 0 5px 0; font-weight:500; }
+  form input, form select { width:100%; padding:8px; margin-bottom:15px; border-radius:5px; border:1px solid #dcdde1; }
+  button { background:#e84118; color:#fff; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; transition:0.2s; }
+  button:hover { background:#c23616; }
+  table { width:100%; border-collapse:collapse; margin-top:15px; }
+  th, td { padding:10px; border:1px solid #dcdde1; text-align:left; }
+  th { background:#e84118; color:#fff; }
+  tr:nth-child(even) { background:#f1f2f6; }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #111;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    color: white;
+    z-index: 1000;
+  }
+  nav div { text-align: center; font-size: 12px; cursor: pointer; transition: 0.2s; }
+  nav div:hover { color: #D4AF37; }
+  nav div.active { color: #D4AF37; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Signalement Pertes / Erreurs</h1>
+</header>
+<main>
+  <!-- Formulaire déclaration perte -->
+  <section id="declareLossSection">
+    <h2>Déclarer un produit disparu / perdu</h2>
+    <form id="lossForm">
+      <label for="productName">Produit :</label>
+      <input type="text" id="productName" required>
+
+      <label for="quantityLost">Quantité perdue :</label>
+      <input type="number" id="quantityLost" min="1" required>
+
+      <label for="reason">Raison :</label>
+      <select id="reason" required>
+        <option value="perte">Perte</option>
+        <option value="erreur_stock">Erreur de stock</option>
+        <option value="casse">Casse / endommagé</option>
+        <option value="autre">Autre</option>
+      </select>
+
+      <button type="submit">Déclarer perte</button>
+    </form>
+  </section>
+
+  <!-- Historique pertes -->
+  <section id="lossHistorySection">
+    <h2>Historique des pertes</h2>
+    <table id="lossTable">
+      <thead>
+        <tr>
+          <th>Produit</th>
+          <th>Quantité</th>
+          <th>Raison</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rempli via JS -->
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<!-- NAVIGATION GLOBALE -->
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
+  <div class="nav-item" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item active" data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<script type="module" src="js/losses.js"></script>
+<script src="js/nav.js"></script>
+</body>
+</html>

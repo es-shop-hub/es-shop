@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ES Shop - Statistiques</title>
+
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif;}
+  body { background:#F5F5F5; color:#111; padding-bottom:70px; }
+
+  header {
+    background:#0B3D2E; color:white; padding:12px 15px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+
+  header h3 { font-size:18px; }
+  header .status { font-size:12px; color:#D4AF37; }
+
+  .container { padding:20px; }
+
+  .stats-section {
+    background:white;
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:20px;
+    box-shadow:0 3px 8px rgba(0,0,0,0.08);
+  }
+
+  .stats-section h4 {
+    margin-bottom:12px;
+    color:#0B3D2E;
+  }
+
+  .totals {
+    display:flex;
+    justify-content:space-around;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+
+  .totals div {
+    background:#0B3D2E;
+    color:white;
+    padding:12px 15px;
+    border-radius:10px;
+    margin:5px;
+    flex:1;
+    text-align:center;
+    min-width:120px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.08);
+    transition:0.3s;
+    font-size:13px;
+  }
+
+  .totals div:hover {
+    transform:translateY(-3px);
+  }
+
+  /* EXPORT BUTTONS */
+  .export-group {
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:15px;
+  }
+
+  .btn-export {
+    flex:1;
+    background:#D4AF37;
+    color:white;
+    border:none;
+    border-radius:10px;
+    padding:10px;
+    cursor:pointer;
+    transition:0.2s;
+    font-size:14px;
+  }
+
+  .btn-export:hover {
+    background:#BFA135;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #111;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    color: white;
+    z-index: 1000;
+  }
+
+  nav div {
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  nav div:hover {
+    color: #D4AF37;
+  }
+
+  nav div.active {
+    color: #D4AF37;
+    font-weight: bold;
+  }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h3>ES Shop - Statistiques</h3>
+  <div class="status">● Online</div>
+</header>
+
+<div class="container">
+
+  <!-- WEEK -->
+  <div class="stats-section">
+    <h4>📄 Semaine (7 derniers jours)</h4>
+    <div class="totals" id="daily-totals"></div>
+
+    <div class="export-group">
+      <button class="btn-export" id="export-week">Exporter PDF Semaine</button>
+    </div>
+  </div>
+
+  <!-- MONTH -->
+  <div class="stats-section">
+    <h4>📅 Mois (5 dernières semaines)</h4>
+    <div class="totals" id="weekly-totals"></div>
+
+    <div class="export-group">
+      <button class="btn-export" id="export-month">Exporter PDF Mois</button>
+    </div>
+  </div>
+
+  <!-- YEAR -->
+  <div class="stats-section">
+    <h4>📆 Année (12 mois)</h4>
+    <div class="totals" id="monthly-totals"></div>
+
+    <div class="totals" id="yearly-total"></div>
+
+    <div class="export-group">
+      <button class="btn-export" id="export-year">Exporter PDF Année</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- NAVIGATION GLOBALE -->
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item active" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
+  <div class="nav-item" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<script src="js/nav.js"></script>
+<script type="module" src="js/stats.js"></script>
+
+</body>
+</html>
