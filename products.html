@@ -5,88 +5,190 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ES Shop - Produits</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; font-family: Arial,sans-serif;}
-  body { background:#F5F5F5; color:#111; }
+ /* --- RESET & GLOBAL oui--- */ 
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
 
-  header {
-    background:#0B3D2E; color:white; padding:12px; display:flex; justify-content:space-between; align-items:center;
-  }
-  header h3 { font-size:18px; }
-  header .status { font-size:12px; color:#D4AF37; }
+body {
+  background: #F5F5F5;
+  color: #111;
+  line-height: 1.4;
+}
 
-  .container { padding:15px; }
-
-  table {
-    width:100%; border-collapse: collapse; background:white; border-radius:12px; overflow:hidden; box-shadow:0 3px 8px rgba(0,0,0,0.08);
-  }
-
-  th, td {
-    padding:12px; text-align:left; font-size:14px;
-    border-bottom:1px solid #eee;
-  }
-
-  th { background:#0B3D2E; color:white; }
-
-  tr:hover { background:#f0f8ff; }
-
-  .stock-ok { color:green; font-weight:bold; }
-  .stock-low { color:red; font-weight:bold; }
-
-  .btn {
-    padding:6px 10px; border:none; border-radius:8px; cursor:pointer; font-size:13px; margin-right:5px;
-  }
-
-  .btn-add { background:#0B3D2E; color:white; }
-  .btn-edit { background:#D4AF37; color:white; }
-  .btn-delete { background:#C0392B; color:white; }
-
-  .add-product {
-    margin-bottom:10px; display:flex; justify-content:flex-end;
-  }
-
-  .add-product button { background:#0B3D2E; color:white; padding:10px 16px; border:none; border-radius:10px; cursor:pointer; }
-
-  /* NAV */
-  nav {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    background: #111;
-    display: flex;
-    
-    padding: 5px 0;
-    color: white;
-    z-index: 1000;
-  }
-
-  nav div {
-    text-align: center;
-    font-size: 8px;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-
-  nav div:hover,
-  nav div.active { color: #D4AF37; font-weight: bold; }
-  .auth-links {
+/* --- HEADER --- */
+header {
+  background: #0B3D2E;
+  color: white;
+  padding: 10px 15px;
   display: flex;
-  gap: 15px;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h3 {
+  font-size: 16px;
+}
+
+header .status {
+  font-size: 11px;
+  color: #D4AF37;
+  font-weight: bold;
+}
+
+/* --- CONTAINER --- */
+.container {
+  padding: 15px;
+  max-width: 1100px;
+  margin: auto;
+}
+
+/* --- TABLE --- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  margin-bottom: 15px;
+}
+
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid #eee;
+}
+
+th {
+  background: #0B3D2E;
+  color: white;
+}
+
+tr:hover {
+  background: #f0f8ff;
+}
+
+.stock-ok { color: green; font-weight: bold; }
+.stock-low { color: red; font-weight: bold; }
+
+/* --- BUTTONS --- */
+.btn {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 4px;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.btn:hover { transform: translateY(-1px); }
+
+.btn-add { background: #0B3D2E; color: white; }
+.btn-edit { background: #D4AF37; color: white; }
+.btn-delete { background: #C0392B; color: white; }
+
+.add-product {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.add-product button {
+  background: #0B3D2E;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+.add-product button:hover {
+  background: #093022;
+}
+
+/* --- NAVIGATION --- */
+nav {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: #111;
+  display: flex;
+  justify-content: space-around;
+  padding: 5px 0;
+  color: white;
+  z-index: 1000;
+}
+
+nav div {
+  text-align: center;
+  font-size: 11px;
+  cursor: pointer;
+  transition: 0.2s;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+nav div:hover,
+nav div.active {
+  color: #D4AF37;
+  font-weight: bold;
+  background: rgba(212,175,55,0.1);
+}
+
+/* --- AUTH LINKS (Login / Signup) --- */
+.auth-links {
+  display: flex;
+  gap: 10px;
   justify-content: center;
-  margin: 50px 0;
+  margin: 30px 0;
 }
 
 .auth-links .btn {
-  padding: 12px 25px;
+  padding: 8px 18px;
   text-decoration: none;
   background: #40739e;
   color: #fff;
-  border-radius: 8px;
+  border-radius: 6px;
   font-weight: bold;
-  transition: background 0.2s;
+  font-size: 13px;
 }
 
 .auth-links .btn:hover {
   background: #2f3640;
+}
+
+/* --- FORM ELEMENTS --- */
+form label {
+  display: block;
+  margin: 8px 0 4px;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+form input,
+form select,
+form textarea {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  border: 1px solid #dcdde1;
+  font-size: 13px;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+
+form input:focus,
+form select:focus,
+form textarea:focus {
+  outline: none;
+  border-color: #0B3D2E;
+  box-shadow: 0 0 4px rgba(11,61,46,0.3);
 }
 </style>
 </head>
@@ -119,9 +221,7 @@
       <!-- Produits injectés dynamiquement par products.js -->
     </tbody>
   </table>
-
 </div>
-
 <!-- NAVIGATION GLOBALE -->
 <nav>
   <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
