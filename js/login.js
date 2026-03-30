@@ -1,17 +1,20 @@
 // login.js
-import { db, collection, doc, getDoc } from './firebase.js';
-import { signInWithEmailAndPassword, getAuth, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { db, collection, doc, getDoc, addDoc, Timestamp } from './firebase.js';
+
+import { 
+  signInWithEmailAndPassword, 
+  getAuth, 
+  setPersistence, 
+  browserLocalPersistence, 
+  browserSessionPersistence 
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 const auth = getAuth();
 
-// DOM Elements
 const loginForm = document.getElementById('loginForm');
 const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const rememberMeCheckbox = document.getElementById('rememberMe');
-
-// ID utilisateur courant (sera défini après login)
-let currentUserId = null;
 
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -19,50 +22,66 @@ loginForm.addEventListener('submit', async (e) => {
   const email = emailInput.value.trim();
   const password = passwordInput.value;
 
-  if (!email || !password) return alert("Veuillez remplir tous les champs !");
+  if (!email || !password) {
+    alert("Remplis tous les champs");
+    return;
+  }
 
   try {
-    // Définir la persistance en fonction du checkbox
-    await setPersistence(auth, rememberMeCheckbox.checked ? browserLocalPersistence : browserSessionPersistence);
+    // 🔐 Persistence
+    await setPersistence(
+      auth,
+      rememberMeCheckbox.checked ? browserLocalPersistence : browserSessionPersistence
+    );
 
-    // Connexion Firebase
+    // 🔐 Login Auth
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    currentUserId = userCredential.user.uid;
+    const uid = userCredential.user.uid;
 
-    // Vérification rôle depuis Firestore
-    const userDoc = await getDoc(doc(db, "users", currentUserId));
+    // 🔎 Get Firestore user (ID = UID)
+    const userDoc = await getDoc(doc(db, "users", uid));
+
     if (!userDoc.exists()) {
-      alert("Utilisateur inconnu !");
+      alert("Utilisateur non configuré !");
       return;
     }
 
     const userData = userDoc.data();
 
     if (!userData.isActive) {
-      alert("Compte désactivé !");
+      alert("Compte désactivé");
       return;
     }
 
-    // Rôle autorisé: admin, seller, user
     if (!["admin", "seller", "user"].includes(userData.role)) {
-      alert("Accès refusé !");
+      alert("Accès refusé");
       return;
     }
 
-    // Log connexion (sécurisé)
+    // 🧠 Stock local (utile pour ton app)
+    localStorage.setItem("userId", uid);
+    localStorage.setItem("userRole", userData.role);
+
+    // 📜 Log
     await addDoc(collection(db, "logs"), {
-      userId: currentUserId,
+      userId: uid,
       action: "login",
       role: userData.role,
-      timestamp: new Date()
+      createdAt: Timestamp.now()
     });
 
-    alert("Connexion réussie !");
-    // Redirige vers index.html après login
-    window.location.href = "index.html";
+    // 🚀 REDIRECTION PROPRE (sans alert)
+    window.location.replace("index.html");
 
   } catch (err) {
-    console.error("Erreur login:", err);
-    alert("Email ou mot de passe incorrect !");
+    console.error(err);
+
+    if (err.code === "auth/user-not-found") {
+      alert("Utilisateur introuvable");
+    } else if (err.code === "auth/wrong-password") {
+      alert("Mot de passe incorrect");
+    } else {
+      alert("Erreur de connexion");
+    }
   }
 });
