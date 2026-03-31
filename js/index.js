@@ -2,12 +2,10 @@
 import { 
   db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs 
 } from './firebase.js';
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 // --- OFFLINE ---
 enableIndexedDbPersistence(db).catch(err => console.warn("Offline persistence non disponible :", err));
-
-// --- PANIER ---
-let cart = [];
 
 // --- DOM ---
 const productsContainer = document.getElementById('productsContainer');
@@ -17,12 +15,16 @@ const sellBtn = cartDom.querySelector('.sell-btn');
 const manualDateCheckbox = document.getElementById('manualDate');
 const saleDateInput = document.getElementById('saleDate');
 
-// --- USER ---
-const currentUserId = "user_1";
+// --- CART ---
+let cart = [];
+
+// --- AUTH ---
+const auth = getAuth();
+let currentUserId = null;
 
 // --- CHECK USER ---
-async function checkUser() {
-  const userDoc = await getDoc(doc(db, "users", currentUserId));
+async function checkUser(uid) {
+  const userDoc = await getDoc(doc(db, "users", uid));
   if (!userDoc.exists()) throw new Error("Utilisateur inconnu");
   const data = userDoc.data();
   if (!data.isActive || (data.role !== "admin" && data.role !== "seller")) {
@@ -31,14 +33,13 @@ async function checkUser() {
   return data;
 }
 
-// --- LOAD PRODUCTS (🔥 AJOUT CRITIQUE) ---
+// --- LOAD PRODUCTS ---
 async function loadProducts() {
   const snap = await getDocs(collection(db, "products"));
   productsContainer.innerHTML = "";
 
   snap.forEach(docSnap => {
     const p = docSnap.data();
-
     if (!p.isActive) return;
 
     const div = document.createElement('div');
@@ -48,23 +49,19 @@ async function loadProducts() {
     div.innerHTML = `
       <h4>${p.name}</h4>
       <p>Stock: ${p.stock_current}</p>
-      <p>${p.price_sell}$</p>
+      <p>${p.price_sell.toFixed(2)}$</p>
     `;
 
-    // CLICK → ADD TO CART
     div.addEventListener('click', () => addToCart(docSnap.id, p, div));
-
     productsContainer.appendChild(div);
   });
 }
 
 // --- ADD TO CART ---
 function addToCart(productId, data, element) {
-
   if (data.stock_current <= 0) return alert("Stock épuisé !");
 
   const exist = cart.find(i => i.productId === productId);
-
   if (exist) exist.qty++;
   else cart.push({
     name: data.name,
@@ -80,7 +77,7 @@ function addToCart(productId, data, element) {
   updateCartUI();
 }
 
-// --- UI CART ---
+// --- UPDATE CART UI ---
 function updateCartUI() {
   cartDom.querySelectorAll('.cart-item').forEach(item => item.remove());
 
@@ -94,7 +91,6 @@ function updateCartUI() {
       <span>${(item.qty * item.price).toFixed(2)}$</span>
     `;
     cartDom.insertBefore(div, cartTotalDom);
-
     total += item.qty * item.price;
   });
 
@@ -104,9 +100,10 @@ function updateCartUI() {
 // --- SELL ---
 sellBtn.addEventListener('click', async () => {
   if (cart.length === 0) return alert("Panier vide !");
-  
+
   try {
-    const userData = await checkUser();
+    if (!currentUserId) throw new Error("Utilisateur non connecté");
+    const userData = await checkUser(currentUserId);
 
     let saleDate = Timestamp.now();
     if (manualDateCheckbox.checked && saleDateInput.value) {
@@ -127,7 +124,6 @@ sellBtn.addEventListener('click', async () => {
 
     // --- LOOP ITEMS ---
     for (const item of cart) {
-
       await addDoc(collection(db, "sale_items"), {
         saleId: saleRef.id,
         productId: item.productId,
@@ -173,13 +169,27 @@ sellBtn.addEventListener('click', async () => {
     saleDateInput.value = "";
     manualDateCheckbox.checked = false;
 
-    loadProducts(); // 🔥 refresh stock affiché
+    loadProducts(); // refresh stock affiché
 
   } catch (e) {
     console.error("Erreur vente :", e);
-    alert("Erreur lors de la vente !");
+    alert(e.message || "Erreur lors de la vente !");
   }
 });
 
 // --- INIT ---
-loadProducts();
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    alert("Utilisateur non connecté !");
+    window.location.replace("login.html");
+    return;
+  }
+  currentUserId = user.uid;
+  try {
+    await checkUser(currentUserId);
+    loadProducts();
+  } catch (e) {
+    alert(e.message);
+    console.error(e);
+  }
+});
