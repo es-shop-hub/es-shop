@@ -1,22 +1,18 @@
 // signup.js
-import { 
-  db, doc, Timestamp 
-} from './firebase.js';
-
-import { setDoc, getAuth, createUserWithEmailAndPassword 
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { db, doc, setDoc, Timestamp } from './firebase.js'; // Firestore
+import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js"; // Auth
 
 const auth = getAuth();
-
 const signupForm = document.getElementById('signupForm');
 
-// --- SIGNUP ---
 signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
+  // --- Récupérer les champs du formulaire
   const fullName = document.getElementById('fullName').value.trim();
   const email = document.getElementById('email').value.trim().toLowerCase();
   const password = document.getElementById('password').value;
+  const isActive = document.getElementById('isActive').checked; // ✅ récupère le checkbox
 
   if (!fullName || !email || !password) {
     alert("Remplis tous les champs");
@@ -24,23 +20,21 @@ signupForm.addEventListener('submit', async (e) => {
   }
 
   try {
-    // 🔐 1. CREATE AUTH USER
+    // 🔐 1. Création Auth
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const uid = userCredential.user.uid;
 
-    // 🧠 2. CREATE FIRESTORE USER (ID = UID)
+    // 🧠 2. Création Firestore avec UID = ID
     await setDoc(doc(db, "users", uid), {
-      userId: uid, // optionnel mais utile
+      userId: uid,
       fullName,
       email,
-      role: "user", // sécurité anti infiltration
-      isActive: true,
+      role: "user", // sécurité
+      isActive,     // ✅ checkbox pris en compte
       createdAt: Timestamp.now()
     });
 
     alert("Compte créé !");
-
-    // 🚀 3. REDIRECTION PROPRE
     window.location.replace("login.html");
 
   } catch (err) {
