@@ -1,17 +1,21 @@
-import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from './firebase.js';
+// settings.js
+import { 
+  db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, serverTimestamp 
+} from './firebase.js';
 
-// --- VÉRIFICATION RÔLE ADMIN ---
-const currentUserRole = localStorage.getItem('userRole'); // ex: stocké au login
-const currentUserId = localStorage.getItem('userId'); // pour éviter auto-suppression
-if (!['master', 'admin'].includes(currentUserRole)) {
-  alert("Accès refusé : réservé aux administrateurs.");
-  document.body.innerHTML = "<h1>Accès refusé</h1>";
-  throw new Error("Non-admin tenté d'accéder à settings");
-}
+import { 
+  getAuth, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+const auth = getAuth();
+
+// --- GLOBAL USER ---
+let currentUserId = null;
+let currentUserRole = null;
 
 // --- COLLECTIONS ---
 const usersCollection = collection(db, 'users');
-const systemConfigDoc = doc(db, 'system', 'config');
+const systemConfigRef = doc(db, 'system', 'config');
 
 // --- DOM ---
 const usersTableBody = document.querySelector('#usersTable tbody');
@@ -25,116 +29,188 @@ const newUserRole = document.getElementById('newUserRole');
 const alertsToggle = document.getElementById('alertsToggle');
 const systemLockToggle = document.getElementById('systemLockToggle');
 
+// --- AUTH CHECK ---
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    alert("Non connecté");
+    window.location.href = "login.html";
+    return;
+  }
+
+  currentUserId = user.uid;
+
+  const userDoc = await getDoc(doc(db, "users", user.uid));
+
+  if (!userDoc.exists()) {
+    alert("Utilisateur non configuré");
+    return;
+  }
+
+  const data = userDoc.data();
+  currentUserRole = data.role;
+
+  if (!["admin", "master"].includes(currentUserRole)) {
+    alert("Accès refusé");
+    document.body.innerHTML = "<h1>Accès refusé</h1>";
+    return;
+  }
+
+  // INIT
+  loadUsers();
+  loadSystemConfig();
+});
+
 // --- LOAD USERS ---
 async function loadUsers() {
   usersTableBody.innerHTML = '';
+
   const snapshot = await getDocs(usersCollection);
+
   snapshot.forEach(docSnap => {
     const data = docSnap.data();
+    const userId = docSnap.id;
+
     const tr = document.createElement('tr');
 
-    // Actions : seul un master peut changer rôle
-    let roleActions = `<button onclick="editUser('${docSnap.id}')">Modifier</button>`;
-    if (currentUserRole === 'master' && docSnap.id !== currentUserId) {
-      roleActions += `<button onclick="deleteUser('${docSnap.id}')">Supprimer</button>`;
+    let actions = `<button onclick="editUser('${userId}')">Modifier</button>`;
+
+    if (currentUserRole === 'master' && userId !== currentUserId) {
+      actions += `<button onclick="deleteUser('${userId}')">Supprimer</button>`;
     }
 
     tr.innerHTML = `
-      <td>${data.name}</td>
+      <td>${data.fullName || data.name || '-'}</td>
       <td>${data.email}</td>
       <td>${data.role}</td>
-      <td>${roleActions}</td>
+      <td>${actions}</td>
     `;
+
     usersTableBody.appendChild(tr);
   });
 }
 
-// --- AJOUT UTILISATEUR ---
-addUserBtn.addEventListener('click', () => addUserModal.style.display = 'flex');
-cancelUserBtn.addEventListener('click', () => addUserModal.style.display = 'none');
+// --- ADD USER (Firestore only, NOT Auth) ---
+addUserBtn.addEventListener('click', () => {
+  addUserModal.style.display = 'flex';
+});
+
+cancelUserBtn.addEventListener('click', () => {
+  addUserModal.style.display = 'none';
+});
 
 saveUserBtn.addEventListener('click', async () => {
   const name = newUserName.value.trim();
   const email = newUserEmail.value.trim();
   let role = newUserRole.value;
 
-  if (!name || !email) return alert("Nom et email requis.");
+  if (!name || !email) return alert("Nom et email requis");
 
-  // Seul master peut créer admin
-  if (role === 'master' && currentUserRole !== 'master') role = 'seller';
+  if (role === "master" && currentUserRole !== "master") {
+    role = "seller";
+  }
 
-  await addDoc(usersCollection, {
-    name,
+  const ref = await addDoc(usersCollection, {
+    fullName: name,
     email,
     role,
+    isActive: true,
     createdAt: serverTimestamp()
   });
 
-  newUserName.value = '';
-  newUserEmail.value = '';
-  newUserRole.value = 'seller';
+  // LOG
+  await addDoc(collection(db, "logs"), {
+    userId: currentUserId,
+    action: "create_user_firestore",
+    targetId: ref.id,
+    createdAt: serverTimestamp()
+  });
+
   addUserModal.style.display = 'none';
   loadUsers();
 });
 
-// --- MODIFIER UTILISATEUR ---
+// --- EDIT USER ---
 window.editUser = async (id) => {
-  if (id === currentUserId) return alert("Impossible de modifier votre propre rôle ici.");
+  if (id === currentUserId) {
+    alert("Impossible de modifier ton propre rôle ici");
+    return;
+  }
 
-  const snapshot = await getDocs(usersCollection);
-  const userDoc = snapshot.docs.find(d => d.id === id);
-  if (!userDoc) return;
-  const data = userDoc.data();
+  const userRef = doc(db, "users", id);
+  const snap = await getDoc(userRef);
 
-  const newName = prompt("Nom :", data.name);
+  if (!snap.exists()) return;
+
+  const data = snap.data();
+
+  const newName = prompt("Nom :", data.fullName || data.name);
   const newEmail = prompt("Email :", data.email);
 
   let newRole = data.role;
-  if (currentUserRole === 'master') {
-    newRole = prompt("Rôle (master/admin/seller) :", data.role);
-    if (!['master','admin','seller'].includes(newRole)) {
-      alert("Rôle invalide, modification annulée.");
-      return;
-    }
+
+  if (currentUserRole === "master") {
+    newRole = prompt("Rôle (master/admin/seller/user) :", data.role);
   }
 
   if (!newName || !newEmail) return;
 
-  await updateDoc(doc(db, 'users', id), {
-    name: newName,
+  await updateDoc(userRef, {
+    fullName: newName,
     email: newEmail,
-    role: newRole
+    role: newRole,
+    updatedAt: serverTimestamp()
   });
+
+  await addDoc(collection(db, "logs"), {
+    userId: currentUserId,
+    action: "edit_user",
+    targetId: id,
+    createdAt: serverTimestamp()
+  });
+
   loadUsers();
 };
 
-// --- SUPPRIMER UTILISATEUR ---
+// --- DELETE USER (Firestore only) ---
 window.deleteUser = async (id) => {
-  if (id === currentUserId) return alert("Impossible de supprimer votre propre compte.");
-  if (!confirm("Supprimer cet utilisateur définitivement ?")) return;
-  await deleteDoc(doc(db, 'users', id));
+  if (id === currentUserId) {
+    alert("Impossible de supprimer ton propre compte");
+    return;
+  }
+
+  if (!confirm("Supprimer cet utilisateur ?")) return;
+
+  await deleteDoc(doc(db, "users", id));
+
+  await addDoc(collection(db, "logs"), {
+    userId: currentUserId,
+    action: "delete_user",
+    targetId: id,
+    createdAt: serverTimestamp()
+  });
+
   loadUsers();
 };
 
-// --- CONFIG SYSTEME ---
+// --- SYSTEM CONFIG ---
 async function loadSystemConfig() {
-  const snap = await getDocs(collection(db, 'system'));
-  const config = snap.docs.find(d => d.id === 'config');
-  if (config) {
-    const data = config.data();
+  const snap = await getDoc(systemConfigRef);
+
+  if (snap.exists()) {
+    const data = snap.data();
     alertsToggle.checked = data.alertsEnabled || false;
     systemLockToggle.checked = data.systemLocked || false;
   }
 }
 
 alertsToggle.addEventListener('change', async () => {
-  await updateDoc(systemConfigDoc, { alertsEnabled: alertsToggle.checked });
+  await updateDoc(systemConfigRef, {
+    alertsEnabled: alertsToggle.checked
+  });
 });
 
 systemLockToggle.addEventListener('change', async () => {
-  await updateDoc(systemConfigDoc, { systemLocked: systemLockToggle.checked });
+  await updateDoc(systemConfigRef, {
+    systemLocked: systemLockToggle.checked
+  });
 });
-
-// --- INIT ---
-loadUsers();
-loadSystemConfig();
