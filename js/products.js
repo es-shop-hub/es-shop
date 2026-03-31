@@ -2,6 +2,7 @@
 import { 
   db, collection, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, enableIndexedDbPersistence 
 } from './firebase.js';
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 // --- OFFLINE ---
 enableIndexedDbPersistence(db).catch(err => console.warn("Offline non dispo:", err));
@@ -10,12 +11,13 @@ enableIndexedDbPersistence(db).catch(err => console.warn("Offline non dispo:", e
 const tableBody = document.getElementById('products-table');
 const addBtn = document.querySelector('.add-product button');
 
-// --- USER ---
-const currentUserId = "user_1";
+// --- AUTH & CURRENT USER ---
+const auth = getAuth();
+let currentUserId = null;
 
 // --- CHECK USER ---
-async function checkUser() {
-  const userDoc = await getDoc(doc(db, "users", currentUserId));
+async function checkUser(uid) {
+  const userDoc = await getDoc(doc(db, "users", uid));
   if (!userDoc.exists()) throw new Error("Utilisateur inconnu");
   const data = userDoc.data();
   if (!data.isActive || (data.role !== "admin" && data.role !== "seller")) {
@@ -102,7 +104,7 @@ addBtn.addEventListener('click', async () => {
   loadProducts();
 });
 
-// --- EDIT PRODUCT ---
+// --- EDIT PRODUCT (inclut modification prix + nom, pas stock) ---
 async function editProduct(id, data) {
   const name = prompt("Nom produit?", data.name);
   const price_buy = parseFloat(prompt("Prix achat?", data.price_buy));
@@ -120,8 +122,6 @@ async function editProduct(id, data) {
     price_sell,
     updatedAt: now
   });
-
-  // ⚠️ PAS DE MODIFICATION DIRECTE DU STOCK ICI
 
   await addDoc(collection(db, "logs"), {
     userId: currentUserId,
@@ -157,12 +157,19 @@ async function deactivateProduct(id, name) {
 }
 
 // --- INIT ---
-(async () => {
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    alert("Utilisateur non connecté !");
+    window.location.replace("login.html");
+    return;
+  }
+
   try {
-    await checkUser();
+    currentUserId = user.uid;
+    await checkUser(currentUserId);
     loadProducts();
   } catch (e) {
     alert(e.message);
     console.error(e);
   }
-})();
+});
