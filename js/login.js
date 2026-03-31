@@ -1,87 +1,48 @@
-// login.js
-import { db, collection, doc, getDoc, addDoc, Timestamp } from './firebase.js';
+import { db, doc, setDoc, Timestamp } from './firebase.js';
 
-import { 
-  signInWithEmailAndPassword, 
-  getAuth, 
-  setPersistence, 
-  browserLocalPersistence, 
-  browserSessionPersistence 
+import {
+  getAuth,
+  createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 const auth = getAuth();
 
-const loginForm = document.getElementById('loginForm');
-const emailInput = document.getElementById('email');
-const passwordInput = document.getElementById('password');
-const rememberMeCheckbox = document.getElementById('rememberMe');
-
-loginForm.addEventListener('submit', async (e) => {
+signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const email = emailInput.value.trim();
-  const password = passwordInput.value;
+  const fullName = document.getElementById('fullName').value.trim();
+  const email = document.getElementById('email').value.trim().toLowerCase();
+  const password = document.getElementById('password').value;
 
-  if (!email || !password) {
+  if (!fullName || !email || !password) {
     alert("Remplis tous les champs");
     return;
   }
 
   try {
-    // 🔐 Persistence
-    await setPersistence(
-      auth,
-      rememberMeCheckbox.checked ? browserLocalPersistence : browserSessionPersistence
-    );
-
-    // 🔐 Login Auth
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // 🔐 1. Création Auth
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const uid = userCredential.user.uid;
 
-    // 🔎 Get Firestore user (ID = UID)
-    const userDoc = await getDoc(doc(db, "users", uid));
-
-    if (!userDoc.exists()) {
-      alert("Utilisateur non configuré !");
-      return;
-    }
-
-    const userData = userDoc.data();
-
-    if (!userData.isActive) {
-      alert("Compte désactivé");
-      return;
-    }
-
-    if (!["admin", "seller", "user"].includes(userData.role)) {
-      alert("Accès refusé");
-      return;
-    }
-
-    // 🧠 Stock local (utile pour ton app)
-    localStorage.setItem("userId", uid);
-    localStorage.setItem("userRole", userData.role);
-
-    // 📜 Log
-    await addDoc(collection(db, "logs"), {
-      userId: uid,
-      action: "login",
-      role: userData.role,
+    // 🧠 2. Création Firestore avec UID = ID
+    await setDoc(doc(db, "users", uid), {
+      name: fullName,
+      email,
+      role: "user",
+      isActive: true,
       createdAt: Timestamp.now()
     });
 
-    // 🚀 REDIRECTION PROPRE (sans alert)
-    window.location.replace("index.html");
+    alert("Compte créé !");
+    window.location.href = "login.html";
 
   } catch (err) {
     console.error(err);
 
-    if (err.code === "auth/user-not-found") {
-      alert("Utilisateur introuvable");
-    } else if (err.code === "auth/wrong-password") {
-      alert("Mot de passe incorrect");
+    if (err.code === "auth/email-already-in-use") {
+      alert("Email déjà utilisé");
     } else {
-      alert("Erreur de connexion");
+      alert("Erreur création compte");
     }
   }
 });
