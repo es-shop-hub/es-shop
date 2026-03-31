@@ -3,6 +3,14 @@ import {
   db, collection, addDoc, getDocs, doc, updateDoc, query, where, serverTimestamp 
 } from './firebase.js';
 
+import { 
+  getAuth, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+// --- AUTH ---
+const auth = getAuth();
+let currentUserId = null;
+
 // --- DOM ---
 const purchaseForm = document.getElementById('purchaseForm');
 const stockTableBody = document.querySelector('#stockTable tbody');
@@ -14,54 +22,80 @@ const productsCol = collection(db, 'products');
 const stockMovementsCol = collection(db, 'stock_movements');
 const logsCol = collection(db, 'logs');
 
-// --- SEUIL ALERTES ---
+// --- CONFIG ---
 const STOCK_ALERT_THRESHOLD = 10;
+
+// --- CHECK USER ---
+async function checkUser(uid) {
+  const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid)));
+  
+  // 🔴 correction: on prend doc direct
+  const userDoc = await getDocs(collection(db, "users"));
+  const user = userDoc.docs.find(d => d.id === uid);
+
+  if (!user) throw new Error("Utilisateur inconnu");
+
+  const data = user.data();
+
+  if (!data.isActive || (data.role !== "admin" && data.role !== "seller")) {
+    throw new Error("Accès refusé");
+  }
+
+  return data;
+}
 
 // --- AJOUT COMMANDE ---
 purchaseForm.addEventListener('submit', async e => {
   e.preventDefault();
+
+  if (!currentUserId) return alert("Utilisateur non connecté");
 
   const supplier = document.getElementById('supplierName').value.trim();
   const productName = document.getElementById('productName').value.trim();
   const quantity = parseInt(document.getElementById('quantity').value);
   const unitPrice = parseFloat(document.getElementById('unitPrice').value);
 
-  if (!supplier || !productName || quantity <= 0 || unitPrice <= 0) return alert("Valeurs invalides");
+  if (!supplier || !productName || quantity <= 0 || unitPrice <= 0) {
+    return alert("Valeurs invalides");
+  }
 
   try {
-    // --- AJOUT PURCHASE ---
+    await checkUser(currentUserId);
+
+    const now = serverTimestamp();
+
+    // --- CREATE PURCHASE ---
     const purchaseRef = await addDoc(purchasesCol, {
       supplier,
       total_cost: quantity * unitPrice,
-      createdAt: serverTimestamp()
+      createdAt: now
     });
 
-    // --- RECUP PRODUCT ---
+    // --- FIND OR CREATE PRODUCT ---
     const prodQuery = query(productsCol, where('name', '==', productName));
     const prodSnap = await getDocs(prodQuery);
+
     let productId;
 
     if (!prodSnap.empty) {
-      // produit existant
-      const prodDoc = prodSnap.docs[0];
-      productId = prodDoc.id;
+      productId = prodSnap.docs[0].id;
     } else {
-      // produit nouveau
-      const prodDocRef = await addDoc(productsCol, {
+      const newProd = await addDoc(productsCol, {
         name: productName,
         category: "default",
         price_buy: unitPrice,
-        price_sell: unitPrice * 1.3, // marge par défaut 30%
+        price_sell: unitPrice * 1.3,
         stock_current: 0,
         stock_alert: STOCK_ALERT_THRESHOLD,
         isActive: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: now,
+        updatedAt: now
       });
-      productId = prodDocRef.id;
+
+      productId = newProd.id;
     }
 
-    // --- AJOUT purchase_item ---
+    // --- PURCHASE ITEM ---
     await addDoc(purchaseItemsCol, {
       purchaseId: purchaseRef.id,
       productId,
@@ -69,27 +103,27 @@ purchaseForm.addEventListener('submit', async e => {
       price: unitPrice
     });
 
-    // --- AJOUT stock_movement IN ---
+    // --- STOCK MOVEMENT ---
     await addDoc(stockMovementsCol, {
       productId,
       type: "IN",
       quantity,
       reason: "purchase",
       referenceId: purchaseRef.id,
-      createdBy: "user_1", // remplacer par auth réel
-      createdAt: serverTimestamp()
+      createdBy: currentUserId,
+      createdAt: now
     });
 
-    // --- RECALCUL stock_current ---
+    // --- RECALCUL STOCK ---
     await recalcStock(productId);
 
     // --- LOG ---
     await addDoc(logsCol, {
-      userId: "user_1",
+      userId: currentUserId,
       action: "add_purchase",
       targetId: purchaseRef.id,
       details: { supplier, productName, quantity, unitPrice },
-      createdAt: serverTimestamp()
+      createdAt: now
     });
 
     purchaseForm.reset();
@@ -97,13 +131,14 @@ purchaseForm.addEventListener('submit', async e => {
 
   } catch (err) {
     console.error(err);
-    alert("Erreur lors de l'ajout de la commande");
+    alert(err.message || "Erreur lors de l'achat");
   }
 });
 
-// --- RECALCUL stock_current depuis stock_movements ---
+// --- RECALCUL STOCK ---
 async function recalcStock(productId) {
   const movSnap = await getDocs(query(stockMovementsCol, where("productId", "==", productId)));
+
   let total = 0;
 
   movSnap.forEach(docSnap => {
@@ -112,10 +147,13 @@ async function recalcStock(productId) {
     if (m.type === "OUT" || m.type === "loss") total -= m.quantity;
   });
 
-  await updateDoc(doc(productsCol, productId), { stock_current: total, updatedAt: serverTimestamp() });
+  await updateDoc(doc(productsCol, productId), {
+    stock_current: total,
+    updatedAt: serverTimestamp()
+  });
 
   if (total <= STOCK_ALERT_THRESHOLD) {
-    console.warn(`ALERTE : Stock critique pour ${productId} → ${total} unités`);
+    console.warn(`⚠️ Stock critique: ${productId} → ${total}`);
   }
 }
 
@@ -129,6 +167,7 @@ async function loadStock() {
     if (!p.isActive) return;
 
     const tr = document.createElement('tr');
+
     tr.innerHTML = `
       <td>${p.name}</td>
       <td>-</td>
@@ -137,42 +176,66 @@ async function loadStock() {
       <td>${(p.stock_current * p.price_buy).toFixed(2)} $</td>
       <td><button onclick="manualUpdate('${docSnap.id}')">Modifier</button></td>
     `;
+
     stockTableBody.appendChild(tr);
   });
 }
 
-// --- UPDATE MANUEL stock_current ---
-window.manualUpdate = async productId => {
+// --- MANUAL UPDATE ---
+window.manualUpdate = async (productId) => {
+  if (!currentUserId) return alert("Non connecté");
+
   const newQty = parseInt(prompt("Nouvelle quantité :"));
   if (isNaN(newQty) || newQty < 0) return;
 
-  const prodRef = doc(productsCol, productId);
-  const prodSnap = await getDocs(query(productsCol, where("name", "==", productId)));
-  const prodData = prodSnap.docs.find(d => d.id === productId)?.data();
+  try {
+    await checkUser(currentUserId);
 
-  await updateDoc(prodRef, { stock_current: newQty, updatedAt: serverTimestamp() });
+    await updateDoc(doc(productsCol, productId), {
+      stock_current: newQty,
+      updatedAt: serverTimestamp()
+    });
 
-  // --- LOG STOCK MANUEL ---
-  await addDoc(stockMovementsCol, {
-    productId,
-    type: "IN",
-    quantity: newQty,
-    reason: "manualUpdate",
-    referenceId: null,
-    createdBy: "user_1",
-    createdAt: serverTimestamp()
-  });
+    await addDoc(stockMovementsCol, {
+      productId,
+      type: "IN",
+      quantity: newQty,
+      reason: "manualUpdate",
+      referenceId: null,
+      createdBy: currentUserId,
+      createdAt: serverTimestamp()
+    });
 
-  await addDoc(logsCol, {
-    userId: "user_1",
-    action: "manual_stock_update",
-    targetId: productId,
-    details: { newQty },
-    createdAt: serverTimestamp()
-  });
+    await addDoc(logsCol, {
+      userId: currentUserId,
+      action: "manual_stock_update",
+      targetId: productId,
+      details: { newQty },
+      createdAt: serverTimestamp()
+    });
 
-  loadStock();
-}
+    loadStock();
+
+  } catch (e) {
+    console.error(e);
+    alert(e.message);
+  }
+};
 
 // --- INIT ---
-loadStock();
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    alert("Utilisateur non connecté !");
+    window.location.replace("login.html");
+    return;
+  }
+
+  currentUserId = user.uid;
+
+  try {
+    await checkUser(currentUserId);
+    loadStock();
+  } catch (e) {
+    alert(e.message);
+  }
+});
