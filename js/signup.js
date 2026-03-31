@@ -1,16 +1,14 @@
 // signup.js
 import { 
-  db, collection, addDoc, Timestamp 
+  db, doc, Timestamp 
 } from './firebase.js';
 
-import { 
-  getAuth, createUserWithEmailAndPassword 
+import { setDoc, getAuth, createUserWithEmailAndPassword 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 const auth = getAuth();
 
 const signupForm = document.getElementById('signupForm');
-const usersCollection = collection(db, 'users');
 
 // --- SIGNUP ---
 signupForm.addEventListener('submit', async (e) => {
@@ -26,13 +24,13 @@ signupForm.addEventListener('submit', async (e) => {
   }
 
   try {
-    // 🔥 1. CREATE AUTH USER
+    // 🔐 1. CREATE AUTH USER
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    const uid = userCredential.user.uid;
 
-    // 🔥 2. CREATE FIRESTORE USER
-    await addDoc(usersCollection, {
-      userId: user.uid, // lien avec auth
+    // 🧠 2. CREATE FIRESTORE USER (ID = UID)
+    await setDoc(doc(db, "users", uid), {
+      userId: uid, // optionnel mais utile
       fullName,
       email,
       role: "user", // sécurité anti infiltration
@@ -41,9 +39,9 @@ signupForm.addEventListener('submit', async (e) => {
     });
 
     alert("Compte créé !");
-    
-    // 🔥 3. REDIRECT LOGIN
-    window.location.href = "login.html";
+
+    // 🚀 3. REDIRECTION PROPRE
+    window.location.replace("login.html");
 
   } catch (err) {
     console.error(err);
@@ -52,6 +50,8 @@ signupForm.addEventListener('submit', async (e) => {
       alert("Email déjà utilisé");
     } else if (err.code === "auth/weak-password") {
       alert("Mot de passe trop faible");
+    } else if (err.code === "auth/network-request-failed") {
+      alert("Problème de connexion internet");
     } else {
       alert("Erreur création compte");
     }
