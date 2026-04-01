@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Achats fournisseurs</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: #111;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 0;
+      color: white;
+      z-index: 1000;
+    }
+    nav div {
+      text-align: center;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    nav div.active {
+      color: #D4AF37;
+      font-weight: bold;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding-bottom: 70px;
+      background: #f5f6fa;
+    }
+
+    h2 {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    form {
+      max-width: 500px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    form input, form select {
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    form button {
+      padding: 10px;
+      background: #192a56;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    table {
+      width: 95%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background: #fff;
+    }
+
+    table th, table td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+
+    table th {
+      background: #192a56;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
+  <div class="nav-item active" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<h2>Ajouter une commande fournisseur</h2>
+
+<form id="purchaseForm">
+
+  <label>Fournisseur :</label>
+  <input type="text" id="supplierName" required>
+
+  <label>Produit :</label>
+  <select id="productSelect" required>
+    <option value="">-- Sélectionner --</option>
+  </select>
+
+  <input type="text" id="productName" placeholder="Nouveau produit" style="display:none;">
+
+  <!-- 🔥 AJOUT IMPORTANT -->
+  <input type="text" id="variant" placeholder="Variante (ex: grand, petit, rouge)">
+  <input type="text" id="imageUrl" placeholder="URL image produit">
+
+  <label>Quantité :</label>
+  <input type="number" id="quantity" min="1" required>
+
+  <label>Prix unitaire :</label>
+  <input type="number" id="unitPrice" min="0.01" step="0.01" required>
+
+  <button type="submit">Ajouter commande</button>
+</form>
+
+<h2>Stock actuel</h2>
+
+<table id="stockTable">
+  <thead>
+    <tr>
+      <th>Produit</th>
+      <th>Stock</th>
+      <th>Prix</th>
+      <th>Total</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script type="module">
+import { db, collection, getDocs } from './firebase.js';
+
+const productSelect = document.getElementById('productSelect');
+const productNameInput = document.getElementById('productName');
+
+// --- SWITCH ---
+productSelect.addEventListener('change', () => {
+  if (productSelect.value === "new") {
+    productNameInput.style.display = "block";
+    productNameInput.value = "";
+  } else {
+    productNameInput.style.display = "none";
+    productNameInput.value = productSelect.value;
+  }
+});
+
+// --- LOAD PRODUITS ---
+async function loadProductOptions() {
+  const snap = await getDocs(collection(db, 'products'));
+
+  snap.forEach(docSnap => {
+    const p = docSnap.data();
+    if (!p.isActive) return;
+
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.textContent = `${p.name} ${p.variant ? "(" + p.variant + ")" : ""}`;
+    productSelect.appendChild(opt);
+  });
+
+  const newOpt = document.createElement('option');
+  newOpt.value = "new";
+  newOpt.textContent = "➕ Nouveau produit";
+  productSelect.appendChild(newOpt);
+}
+
+loadProductOptions();
+</script>
+
+<script type="module" src="js/purchases.js"></script>
+
+<script>
+document.querySelectorAll('nav .nav-item').forEach(item => {
+  item.addEventListener('click', () => location.href = item.dataset.page);
+});
+</script>
+
+</body>
+</html>
