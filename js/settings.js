@@ -2,10 +2,7 @@
 import { 
   db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, serverTimestamp 
 } from './firebase.js';
-
-import { 
-  getAuth, onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 const auth = getAuth();
 
@@ -39,8 +36,7 @@ onAuthStateChanged(auth, async (user) => {
 
   currentUserId = user.uid;
 
-  const userDoc = await getDoc(doc(db, "users", user.uid));
-
+  const userDoc = await getDoc(doc(db, "users", currentUserId));
   if (!userDoc.exists()) {
     alert("Utilisateur non configuré");
     return;
@@ -72,14 +68,14 @@ async function loadUsers() {
 
     const tr = document.createElement('tr');
 
-    let actions = `<button onclick="editUser('${userId}')">Modifier</button>`;
+    let actions = `<button class="btn-edit" onclick="editUser('${userId}')">Modifier</button>`;
 
     if (currentUserRole === 'master' && userId !== currentUserId) {
-      actions += `<button onclick="deleteUser('${userId}')">Supprimer</button>`;
+      actions += `<button class="btn-delete" onclick="deleteUser('${userId}')">Supprimer</button>`;
     }
 
     tr.innerHTML = `
-      <td>${data.fullName || data.name || '-'}</td>
+      <td>${data.name || '-'}</td>
       <td>${data.email}</td>
       <td>${data.role}</td>
       <td>${actions}</td>
@@ -89,14 +85,9 @@ async function loadUsers() {
   });
 }
 
-// --- ADD USER (Firestore only, NOT Auth) ---
-addUserBtn.addEventListener('click', () => {
-  addUserModal.style.display = 'flex';
-});
-
-cancelUserBtn.addEventListener('click', () => {
-  addUserModal.style.display = 'none';
-});
+// --- ADD USER ---
+addUserBtn.addEventListener('click', () => addUserModal.style.display = 'flex');
+cancelUserBtn.addEventListener('click', () => addUserModal.style.display = 'none');
 
 saveUserBtn.addEventListener('click', async () => {
   const name = newUserName.value.trim();
@@ -106,18 +97,17 @@ saveUserBtn.addEventListener('click', async () => {
   if (!name || !email) return alert("Nom et email requis");
 
   if (role === "master" && currentUserRole !== "master") {
-    role = "seller";
+    role = "seller"; // sécurité
   }
 
   const ref = await addDoc(usersCollection, {
-    fullName: name,
+    name,      // standardisé
     email,
     role,
     isActive: true,
     createdAt: serverTimestamp()
   });
 
-  // LOG
   await addDoc(collection(db, "logs"), {
     userId: currentUserId,
     action: "create_user_firestore",
@@ -126,36 +116,33 @@ saveUserBtn.addEventListener('click', async () => {
   });
 
   addUserModal.style.display = 'none';
+  newUserName.value = '';
+  newUserEmail.value = '';
   loadUsers();
 });
 
 // --- EDIT USER ---
 window.editUser = async (id) => {
-  if (id === currentUserId) {
-    alert("Impossible de modifier ton propre rôle ici");
-    return;
-  }
+  if (id === currentUserId) return alert("Impossible de modifier ton propre rôle ici");
 
   const userRef = doc(db, "users", id);
   const snap = await getDoc(userRef);
-
   if (!snap.exists()) return;
 
   const data = snap.data();
 
-  const newName = prompt("Nom :", data.fullName || data.name);
+  const newName = prompt("Nom :", data.name);
   const newEmail = prompt("Email :", data.email);
-
   let newRole = data.role;
 
   if (currentUserRole === "master") {
-    newRole = prompt("Rôle (master/admin/seller/user) :", data.role);
+    newRole = prompt("Rôle (master/admin/seller/user) :", data.role) || data.role;
   }
 
   if (!newName || !newEmail) return;
 
   await updateDoc(userRef, {
-    fullName: newName,
+    name: newName,
     email: newEmail,
     role: newRole,
     updatedAt: serverTimestamp()
@@ -171,13 +158,9 @@ window.editUser = async (id) => {
   loadUsers();
 };
 
-// --- DELETE USER (Firestore only) ---
+// --- DELETE USER ---
 window.deleteUser = async (id) => {
-  if (id === currentUserId) {
-    alert("Impossible de supprimer ton propre compte");
-    return;
-  }
-
+  if (id === currentUserId) return alert("Impossible de supprimer ton propre compte");
   if (!confirm("Supprimer cet utilisateur ?")) return;
 
   await deleteDoc(doc(db, "users", id));
@@ -195,22 +178,17 @@ window.deleteUser = async (id) => {
 // --- SYSTEM CONFIG ---
 async function loadSystemConfig() {
   const snap = await getDoc(systemConfigRef);
+  if (!snap.exists()) return;
 
-  if (snap.exists()) {
-    const data = snap.data();
-    alertsToggle.checked = data.alertsEnabled || false;
-    systemLockToggle.checked = data.systemLocked || false;
-  }
+  const data = snap.data();
+  alertsToggle.checked = data.alertsEnabled || false;
+  systemLockToggle.checked = data.systemLocked || false;
 }
 
 alertsToggle.addEventListener('change', async () => {
-  await updateDoc(systemConfigRef, {
-    alertsEnabled: alertsToggle.checked
-  });
+  await updateDoc(systemConfigRef, { alertsEnabled: alertsToggle.checked });
 });
 
 systemLockToggle.addEventListener('change', async () => {
-  await updateDoc(systemConfigRef, {
-    systemLocked: systemLockToggle.checked
-  });
+  await updateDoc(systemConfigRef, { systemLocked: systemLockToggle.checked });
 });
