@@ -179,6 +179,37 @@
       border: 1px solid #ccc;
       font-size: 12px;
     }
+
+    /* espace pour éviter blocage */
+.products {
+  padding-bottom: 240px;
+}
+
+/* animation panier */
+.cart {
+  transition: transform 0.3s ease;
+}
+
+/* état réduit */
+.cart.hidden {
+  transform: translateY(85%);
+}
+
+/* bouton toggle */
+#toggleCart {
+  position: fixed;
+  bottom: 140px;
+  right: 15px;
+  background: #0B3D2E;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 45px;
+  height: 45px;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 1100;
+      }
   </style>
 </head>
 
@@ -211,7 +242,7 @@
 
   <button class="sell-btn">VENDRE</button>
 </div>
-
+<button id="toggleCart">🛒</button>
 <!-- NAV -->
 <nav>
   <div class="nav-item active" data-page="index.html">🛒 Vente rapide</div>
@@ -240,6 +271,27 @@
   });
 </script>
 
+<script>
+  const cartDom = document.querySelector('.cart');
+const toggleCartBtn = document.getElementById('toggleCart');
+
+// cacher si clic ailleurs
+document.addEventListener('click', (e) => {
+  if (!cartDom.contains(e.target) && e.target !== toggleCartBtn) {
+    cartDom.classList.add('hidden');
+  }
+});
+
+// ouvrir si clic sur panier ou bouton
+cartDom.addEventListener('click', () => {
+  cartDom.classList.remove('hidden');
+});
+
+toggleCartBtn.addEventListener('click', () => {
+  cartDom.classList.toggle('hidden');
+});
+</script>
+  
 <script type="module" src="js/index.js"></script>
 <script src="js/nav.js"></script>
 
