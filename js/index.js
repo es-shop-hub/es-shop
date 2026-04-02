@@ -74,7 +74,7 @@ function renderProducts(list) {
         <h4>${p.name}</h4>
         ${p.variant ? `<div class="variant">${p.variant}</div>` : ""}
         <p>Stock: ${p.stock_current}</p>
-        <p>${p.price_sell.toFixed(2)}$</p>
+        <p>${p.price_sell.toFixed(2)}FC</p>
       </div>
     `;
 
@@ -153,7 +153,7 @@ function updateCartUI() {
         ${item.name} ${item.variant ? `(${item.variant})` : ""} x${item.qty}
       </span>
       <span>
-        ${(item.qty * item.price).toFixed(2)}$
+        ${(item.qty * item.price).toFixed(2)}FC
         <button data-id="${item.productId}">x</button>
       </span>
     `;
@@ -167,7 +167,7 @@ function updateCartUI() {
     total += item.qty * item.price;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)}FC`;
 }
 
 // --- SELL ---
