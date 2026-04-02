@@ -1,13 +1,11 @@
-// stats.js ultra-pro v3 (CORRIGÉ)
+// stats.js ULTRA-PRO v4
 import { 
   db, collection, getDocs, addDoc, doc, getDoc,
+  query, where, orderBy,
   enableIndexedDbPersistence, Timestamp 
 } from './firebase.js';
 
-import { 
-  getAuth, onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import jsPDF from 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 
 // --- OFFLINE ---
@@ -18,6 +16,7 @@ const dailyContainer = document.getElementById('daily-totals');
 const weeklyContainer = document.getElementById('weekly-totals');
 const monthlyContainer = document.getElementById('monthly-totals');
 const yearlyContainer = document.getElementById('yearly-total');
+
 const exportWeekBtn = document.getElementById('export-week');
 const exportMonthBtn = document.getElementById('export-month');
 const exportYearBtn = document.getElementById('export-year');
@@ -26,27 +25,16 @@ const exportYearBtn = document.getElementById('export-year');
 const auth = getAuth();
 let currentUserId = null;
 
-// --- CHECK USER (CORRIGÉ) ---
+// --- CHECK USER ---
 async function checkUser(uid) {
   const userDoc = await getDoc(doc(db, "users", uid));
   if (!userDoc.exists()) throw new Error("Utilisateur inconnu");
 
   const data = userDoc.data();
-
   if (!data.isActive || (data.role !== "admin" && data.role !== "seller")) {
     throw new Error("Accès refusé");
   }
-
   return data;
-}
-
-// --- LOAD SALES ---
-async function loadSales() {
-  const salesSnap = await getDocs(collection(db, "sales"));
-
-  return salesSnap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .filter(s => s.status === "active"); // cohérence avec ton index.js
 }
 
 // --- LOG ---
@@ -60,6 +48,23 @@ async function logAction(action, targetId, details = {}) {
   });
 }
 
+// --- LOAD SALES (SCALABLE) ---
+async function loadSales({ year = null } = {}) {
+  const salesRef = collection(db, "sales");
+  let q;
+
+  if (year) {
+    const start = new Date(year, 0, 1);
+    const end = new Date(year + 1, 0, 1);
+    q = query(salesRef, where("status", "==", "active"), where("createdAt", ">=", start), where("createdAt", "<", end), orderBy("createdAt", "asc"));
+  } else {
+    q = query(salesRef, where("status", "==", "active"), orderBy("createdAt", "asc"));
+  }
+
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
 // --- SAFE DATE ---
 function getDate(sale) {
   if (!sale.createdAt) return new Date();
@@ -67,6 +72,7 @@ function getDate(sale) {
 }
 
 // --- CALCULS ---
+// Hebdo
 function calculateWeekly(sales) {
   const now = new Date();
   const daily = Array(7).fill(0);
@@ -75,7 +81,6 @@ function calculateWeekly(sales) {
   sales.forEach(sale => {
     const d = getDate(sale);
     const diffDays = Math.floor((now - d)/(1000*60*60*24));
-
     if(diffDays < 7) {
       const idx = 6 - diffDays;
       daily[idx] += sale.total_amount || 0;
@@ -86,6 +91,7 @@ function calculateWeekly(sales) {
   return { daily, dailyProfit };
 }
 
+// Mensuel (5 semaines)
 function calculateMonthly(sales) {
   const now = new Date();
   const weeks = Array(5).fill(0);
@@ -95,7 +101,6 @@ function calculateMonthly(sales) {
     const d = getDate(sale);
     const diffDays = Math.floor((now - d)/(1000*60*60*24));
     const weekNum = Math.floor(diffDays/7);
-
     if(weekNum < 5) {
       const idx = 4 - weekNum;
       weeks[idx] += sale.total_amount || 0;
@@ -106,74 +111,88 @@ function calculateMonthly(sales) {
   return { weeks, weeksProfit };
 }
 
-function calculateYearly(sales) {
+// Annuel (12 mois)
+function calculateYearly(sales, year = null) {
   const months = Array(12).fill(0);
   const monthsProfit = Array(12).fill(0);
-  const year = new Date().getFullYear();
+  const currentYear = year || new Date().getFullYear();
 
   sales.forEach(sale => {
     const d = getDate(sale);
-
-    if(d.getFullYear() === year) {
+    if(d.getFullYear() === currentYear) {
       const idx = d.getMonth();
       months[idx] += sale.total_amount || 0;
       monthsProfit[idx] += sale.total_profit || 0;
     }
   });
 
-  return { months, monthsProfit };
+  const totalAmount = months.reduce((a,b)=>a+b,0);
+  const totalProfit = monthsProfit.reduce((a,b)=>a+b,0);
+
+  return { months, monthsProfit, totalAmount, totalProfit };
 }
 
-// --- FORMAT FC ---
-function fc(v) {
-  return `${v.toFixed(0)} FC`;
+// Trimestriel
+function calculateQuarterly(monthlyData) {
+  const quarters = [0,0,0,0];
+  const quartersProfit = [0,0,0,0];
+  monthlyData.months.forEach((amt,i)=>{
+    const q = Math.floor(i/3);
+    quarters[q] += amt;
+    quartersProfit[q] += monthlyData.monthsProfit[i];
+  });
+  return { quarters, quartersProfit };
 }
+
+// --- FORMAT ---
+function fc(v){ return `${v.toFixed(0)} FC`; }
 
 // --- RENDER ---
-function renderWeekly(data) {
+function renderWeekly(data){
   const { daily, dailyProfit } = data;
-
-  dailyContainer.innerHTML = daily.map((v,i)=>
-    `<div>J-${6-i}: Vente ${fc(v)} / Profit ${fc(dailyProfit[i])}</div>`
-  ).join('');
+  dailyContainer.innerHTML = daily.map((v,i)=>`<div>J-${6-i}: Vente ${fc(v)} / Profit ${fc(dailyProfit[i])}</div>`).join('');
 }
 
-function renderMonthly(data) {
+function renderMonthly(data){
   const { weeks, weeksProfit } = data;
-
-  weeklyContainer.innerHTML = weeks.map((v,i)=>
-    `<div>S-${4-i}: Vente ${fc(v)} / Profit ${fc(weeksProfit[i])}</div>`
-  ).join('');
+  weeklyContainer.innerHTML = weeks.map((v,i)=>`<div>S-${4-i}: Vente ${fc(v)} / Profit ${fc(weeksProfit[i])}</div>`).join('');
 }
 
-function renderYearly(data) {
-  const { months, monthsProfit } = data;
+function renderYearly(data){
+  const { months, monthsProfit, totalAmount, totalProfit } = data;
 
-  monthlyContainer.innerHTML = months.map((v,i)=>
-    `<div>${i+1}/${new Date().getFullYear()}: Vente ${fc(v)} / Profit ${fc(monthsProfit[i])}</div>`
-  ).join('');
+  monthlyContainer.innerHTML = months.map((v,i)=>`<div>Mois ${i+1}: Vente ${fc(v)} / Profit ${fc(monthsProfit[i])}</div>`).join('');
 
   yearlyContainer.innerHTML = `
     <div>
-      Total annuel: Vente ${fc(months.reduce((a,b)=>a+b,0))} 
-      / Profit ${fc(monthsProfit.reduce((a,b)=>a+b,0))}
-    </div>`;
+      Total annuel: Vente ${fc(totalAmount)} / Profit ${fc(totalProfit)}
+    </div>
+  `;
+
+  // Affiche trimestre
+  const quarterData = calculateQuarterly(data);
+  yearlyContainer.innerHTML += `
+    <div style="margin-top:8px; font-weight:bold;">
+      Q1: ${fc(quarterData.quarters[0])} / ${fc(quarterData.quartersProfit[0])} |
+      Q2: ${fc(quarterData.quarters[1])} / ${fc(quarterData.quartersProfit[1])} |
+      Q3: ${fc(quarterData.quarters[2])} / ${fc(quarterData.quartersProfit[2])} |
+      Q4: ${fc(quarterData.quarters[3])} / ${fc(quarterData.quartersProfit[3])}
+    </div>
+  `;
 }
 
 // --- EXPORT PDF ---
-function exportPDF(title, container) {
+function exportPDF(title, container){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-
   doc.setFontSize(14);
-  doc.text(title, 14, 20);
+  doc.text(title,14,20);
 
-  let y = 30;
-
-  container.querySelectorAll('div').forEach(div => {
+  let y=30;
+  container.querySelectorAll('div').forEach(div=>{
     doc.setFontSize(12);
-    doc.text(`- ${div.innerText}`, 14, y);
-    y += 6;
+    doc.text(`- ${div.innerText}`,14,y);
+    y+=6;
   });
 
   doc.save(`${title.replace(/\s/g,'_')}.pdf`);
@@ -184,17 +203,16 @@ exportWeekBtn.addEventListener('click', ()=>exportPDF('Stats Hebdomadaire', dail
 exportMonthBtn.addEventListener('click', ()=>exportPDF('Stats Mensuelle', weeklyContainer));
 exportYearBtn.addEventListener('click', ()=>exportPDF('Stats Annuelle', yearlyContainer));
 
-// --- INIT (CORRIGÉ AUTH) ---
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
+// --- INIT ---
+onAuthStateChanged(auth, async (user)=>{
+  if(!user){
     alert("Non connecté");
     window.location.replace("login.html");
     return;
   }
 
   currentUserId = user.uid;
-
-  try {
+  try{
     await checkUser(currentUserId);
 
     const sales = await loadSales();
@@ -203,7 +221,7 @@ onAuthStateChanged(auth, async (user) => {
     renderMonthly(calculateMonthly(sales));
     renderYearly(calculateYearly(sales));
 
-  } catch(e) {
+  }catch(e){
     alert(e.message);
     console.error(e);
   }
