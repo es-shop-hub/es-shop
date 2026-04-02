@@ -181,6 +181,42 @@ document.querySelectorAll('nav div').forEach(el=>{
 </script>
 
 <script type="module" src="js/stats.js"></script>
+<script type="module">
+import { loadSales, calculateWeekly, calculateMonthly, calculateYearly, renderWeekly, renderMonthly, renderYearly } from './js/stats.js';
 
+const yearSelect = document.getElementById('yearSelect');
+
+// --- Remplir le select avec années ---
+async function initYearSelect() {
+  const sales = await loadSales();
+  const years = new Set(sales.map(s => new Date(s.createdAt?.toDate ? s.createdAt.toDate() : s.createdAt || Date.now()).getFullYear()));
+  const sorted = Array.from(years).sort((a,b)=>b-a);
+  sorted.forEach(y=>{
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    yearSelect.appendChild(opt);
+  });
+
+  // Initial render pour l'année sélectionnée
+  renderForYear(sorted[0] || new Date().getFullYear());
+}
+
+// --- Render selon l'année ---
+async function renderForYear(year){
+  const sales = await loadSales({ year });
+  renderWeekly(calculateWeekly(sales));
+  renderMonthly(calculateMonthly(sales));
+  renderYearly(calculateYearly(sales, year));
+}
+
+// --- Événement changement ---
+yearSelect.addEventListener('change', e=>{
+  const y = parseInt(e.target.value);
+  renderForYear(y);
+});
+
+initYearSelect();
+</script>
 </body>
     </html>
