@@ -46,7 +46,7 @@ async function loadProducts() {
       </td>
       <td>${p.name}</td>
       <td>${p.variant || '-'}</td>
-      <td>${p.price_sell.toFixed(2)}$</td>
+      <td>${p.price_sell.toFixed(2)}FC</td>
       <td class="${p.stock_current > p.stock_alert ? 'stock-ok' : 'stock-low'}">
         ${p.stock_current}
       </td>
