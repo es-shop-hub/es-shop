@@ -6,166 +6,180 @@
 <title>ES Shop - Statistiques</title>
 
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif;}
-  body { background:#F5F5F5; color:#111; padding-bottom:70px; }
+* { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif;}
+body { background:#F5F5F5; color:#111; padding-bottom:70px; }
 
-  header {
-    background:#0B3D2E; color:white; padding:12px 15px;
-    display:flex; justify-content:space-between; align-items:center;
-  }
+header {
+  background:#0B3D2E; color:white; padding:12px 15px;
+  display:flex; justify-content:space-between; align-items:center;
+}
 
-  header h3 { font-size:18px; }
-  header .status { font-size:12px; color:#D4AF37; }
+.container { padding:20px; }
 
-  .container { padding:20px; }
+.stats-section {
+  background:white;
+  border-radius:12px;
+  padding:20px;
+  margin-bottom:20px;
+  box-shadow:0 3px 8px rgba(0,0,0,0.08);
+}
 
-  .stats-section {
-    background:white;
-    border-radius:12px;
-    padding:20px;
-    margin-bottom:20px;
-    box-shadow:0 3px 8px rgba(0,0,0,0.08);
-  }
+.stats-section h4 {
+  margin-bottom:12px;
+  color:#0B3D2E;
+}
 
-  .stats-section h4 {
-    margin-bottom:12px;
-    color:#0B3D2E;
-  }
+.totals {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
 
-  .totals {
-    display:flex;
-    justify-content:space-around;
-    flex-wrap:wrap;
-    margin-top:10px;
-  }
+.totals div {
+  background:#0B3D2E;
+  color:white;
+  padding:10px;
+  border-radius:10px;
+  flex:1;
+  text-align:center;
+  font-size:12px;
+}
 
-  .totals div {
-    background:#0B3D2E;
-    color:white;
-    padding:12px 15px;
-    border-radius:10px;
-    margin:5px;
-    flex:1;
-    text-align:center;
-    min-width:120px;
-    box-shadow:0 2px 6px rgba(0,0,0,0.08);
-    transition:0.3s;
-    font-size:13px;
-  }
+/* FILTER */
+.filter-bar {
+  margin-bottom:10px;
+}
 
-  .totals div:hover {
-    transform:translateY(-3px);
-  }
+.filter-bar select {
+  padding:6px;
+  border-radius:6px;
+}
 
-  /* EXPORT BUTTONS */
-  .export-group {
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    margin-top:15px;
-  }
+/* EXPORT BUTTONS */
+.export-buttons {
+  margin-top:10px;
+}
+.export-buttons button {
+  margin-right:6px;
+  padding:6px 12px;
+  border:none;
+  background:#D4AF37;
+  color:#111;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+}
 
-  .btn-export {
-    flex:1;
-    background:#D4AF37;
-    color:white;
-    border:none;
-    border-radius:10px;
-    padding:10px;
-    cursor:pointer;
-    transition:0.2s;
-    font-size:14px;
-  }
+/* GRAPH */
+canvas {
+  width:100%;
+  height:300px;
+  margin-top:15px;
+}
 
-  .btn-export:hover {
-    background:#BFA135;
-  }
+/* NAV */
+nav {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: #111;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0;
+  color: white;
+}
 
-  /* NAV */
-  nav {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    background: #111;
-    display: flex;
-    justify-content: space-around;
-    padding: 10px 0;
-    color: white;
-    z-index: 1000;
-  }
+nav div {
+  font-size:12px;
+  cursor:pointer;
+}
 
-  nav div {
-    text-align: center;
-    font-size: 12px;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-
-  nav div:hover {
-    color: #D4AF37;
-  }
-
-  nav div.active {
-    color: #D4AF37;
-    font-weight: bold;
-  }
+nav .active {
+  color:#D4AF37;
+  font-weight:bold;
+}
 </style>
 </head>
 
 <body>
 
 <header>
-  <h3>ES Shop - Statistiques</h3>
-  <div class="status">● Online</div>
+  <h3>📊 Statistiques</h3>
+  <div>● Online</div>
 </header>
 
 <div class="container">
 
+  <!-- YEAR FILTER -->
+  <div class="stats-section">
+    <h4>📆 Filtrer par année</h4>
+    <div class="filter-bar">
+      <select id="yearSelect"></select>
+    </div>
+  </div>
+
   <!-- WEEK -->
   <div class="stats-section">
-    <h4>📄 Semaine (7 derniers jours)</h4>
+    <h4>📄 7 derniers jours</h4>
     <div class="totals" id="daily-totals"></div>
-
-    <div class="export-group">
-      <button class="btn-export" id="export-week">Exporter PDF Semaine</button>
+    <div class="export-buttons">
+      <button id="export-week">Exporter PDF</button>
     </div>
   </div>
 
   <!-- MONTH -->
   <div class="stats-section">
-    <h4>📅 Mois (5 dernières semaines)</h4>
+    <h4>📅 5 dernières semaines</h4>
     <div class="totals" id="weekly-totals"></div>
-
-    <div class="export-group">
-      <button class="btn-export" id="export-month">Exporter PDF Mois</button>
+    <div class="export-buttons">
+      <button id="export-month">Exporter PDF</button>
     </div>
   </div>
 
   <!-- YEAR -->
   <div class="stats-section">
-    <h4>📆 Année (12 mois)</h4>
+    <h4>📆 12 mois</h4>
     <div class="totals" id="monthly-totals"></div>
-
     <div class="totals" id="yearly-total"></div>
-
-    <div class="export-group">
-      <button class="btn-export" id="export-year">Exporter PDF Année</button>
+    <div class="export-buttons">
+      <button id="export-year">Exporter PDF</button>
     </div>
+  </div>
+
+  <!-- GRAPHS -->
+  <div class="stats-section">
+    <h4>📈 Évolution Hebdomadaire</h4>
+    <canvas id="weekly-chart"></canvas>
+  </div>
+
+  <div class="stats-section">
+    <h4>📈 Évolution Mensuelle</h4>
+    <canvas id="monthly-chart"></canvas>
+  </div>
+
+  <div class="stats-section">
+    <h4>📈 Évolution Annuelle</h4>
+    <canvas id="yearly-chart"></canvas>
   </div>
 
 </div>
 
-<!-- NAVIGATION GLOBALE -->
 <nav>
-  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
-  <div class="nav-item" data-page="products.html">📦 Produits</div>
-  <div class="nav-item active" data-page="stats.html">📊 Stats</div>
-  <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
-  <div class="nav-item" data-page="purchases.html">📥 Achats</div>
-  <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+  <div data-page="index.html">🛒</div>
+  <div data-page="products.html">📦</div>
+  <div class="active" data-page="stats.html">📊</div>
+  <div data-page="settings.html">⚙️</div>
+  <div data-page="purchases.html">📥</div>
+  <div data-page="losses.html">❌</div>
 </nav>
 
-<script src="js/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.querySelectorAll('nav div').forEach(el=>{
+  el.onclick = ()=> location.href = el.dataset.page;
+});
+</script>
+
 <script type="module" src="js/stats.js"></script>
 
 </body>
