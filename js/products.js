@@ -1,6 +1,6 @@
-// products.js - VERSION FINALE PRO
+// products.js - VERSION FINALE ULTIME PRO
 import { 
-  db, collection, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, enableIndexedDbPersistence 
+  db, collection, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, enableIndexedDbPersistence, query, where
 } from './firebase.js';
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
@@ -27,6 +27,19 @@ async function checkUser(uid) {
   return data;
 }
 
+// --- RECALCUL STOCK ---
+async function recalcStock(productId) {
+  const movSnap = await getDocs(query(collection(db, "stock_movements"), where("productId", "==", productId)));
+  let total = 0;
+  movSnap.forEach(docSnap => {
+    const m = docSnap.data();
+    if (m.type === "IN") total += m.quantity;
+    if (m.type === "OUT") total -= m.quantity;
+  });
+  await updateDoc(doc(db, "products", productId), { stock_current: total, updatedAt: Timestamp.now() });
+  return total;
+}
+
 // --- LOAD PRODUCTS ---
 async function loadProducts() {
   const prodSnap = await getDocs(collection(db, "products"));
@@ -35,14 +48,18 @@ async function loadProducts() {
     const p = docSnap.data();
     if (!p.isActive) return;
 
+    const priceSell = p.price_sell ?? 0;
+    const priceMin = p.price_min ?? priceSell;
+    const stockCurrent = p.stock_current ?? 0;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><div class="product-img" style="background-image:url('${p.imageUrl || ''}')"></div></td>
       <td>${p.name}</td>
       <td>${p.variant || '-'}</td>
-      <td>${p.price_sell.toFixed(2)}$</td>
-      <td>${p.price_min.toFixed(2)}$</td>
-      <td class="${p.stock_current > p.stock_alert ? 'stock-ok' : 'stock-low'}">${p.stock_current}</td>
+      <td>${priceSell.toFixed(2)}FC</td>
+      <td>${priceMin.toFixed(2)}FC</td>
+      <td class="${stockCurrent > p.stock_alert ? 'stock-ok' : 'stock-low'}">${stockCurrent}</td>
       <td>
         <button class="btn btn-edit">Modifier</button>
         <button class="btn btn-delete">Désactiver</button>
@@ -69,6 +86,7 @@ addBtn.addEventListener('click', async () => {
   if (!name || !variant || isNaN(price_buy) || isNaN(price_sell) || isNaN(stock) || isNaN(price_min)) {
     return alert("Valeurs invalides");
   }
+  if (price_min <= price_buy) return alert("Prix minimum doit être supérieur au prix d'achat !");
   if (price_sell < price_min) return alert("Prix vente < prix minimum !");
 
   const now = Timestamp.now();
@@ -108,6 +126,7 @@ addBtn.addEventListener('click', async () => {
     createdAt: now
   });
 
+  await recalcStock(prodRef.id);
   loadProducts();
 });
 
@@ -123,6 +142,7 @@ async function editProduct(id, data) {
   if (!name || !variant || isNaN(price_buy) || isNaN(price_sell) || isNaN(price_min)) {
     return alert("Valeurs invalides");
   }
+  if (price_min <= price_buy) return alert("Prix minimum doit être supérieur au prix d'achat !");
   if (price_sell < price_min) return alert("Prix vente < prix minimum !");
 
   const now = Timestamp.now();
@@ -145,6 +165,7 @@ async function editProduct(id, data) {
     createdAt: now
   });
 
+  await recalcStock(id);
   loadProducts();
 }
 
