@@ -1,0 +1,185 @@
+// products.js - VERSION FINALE PRO
+import { 
+  db, collection, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, enableIndexedDbPersistence 
+} from './firebase.js';
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+// --- OFFLINE ---
+enableIndexedDbPersistence(db).catch(err => console.warn("Offline non dispo:", err));
+
+// --- DOM ---
+const tableBody = document.getElementById('products-table');
+const addBtn = document.querySelector('.add-product button');
+
+// --- AUTH ---
+const auth = getAuth();
+let currentUserId = null;
+
+// --- CHECK USER ---
+async function checkUser(uid) {
+  const userDoc = await getDoc(doc(db, "users", uid));
+  if (!userDoc.exists()) throw new Error("Utilisateur inconnu");
+
+  const data = userDoc.data();
+  if (!data.isActive || (data.role !== "admin" && data.role !== "seller")) {
+    throw new Error("Accès refusé");
+  }
+  return data;
+}
+
+// --- LOAD PRODUCTS ---
+async function loadProducts() {
+  const prodSnap = await getDocs(collection(db, "products"));
+  tableBody.innerHTML = "";
+  prodSnap.forEach(docSnap => {
+    const p = docSnap.data();
+    if (!p.isActive) return;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><div class="product-img" style="background-image:url('${p.imageUrl || ''}')"></div></td>
+      <td>${p.name}</td>
+      <td>${p.variant || '-'}</td>
+      <td>${p.price_sell.toFixed(2)}$</td>
+      <td>${p.price_min.toFixed(2)}$</td>
+      <td class="${p.stock_current > p.stock_alert ? 'stock-ok' : 'stock-low'}">${p.stock_current}</td>
+      <td>
+        <button class="btn btn-edit">Modifier</button>
+        <button class="btn btn-delete">Désactiver</button>
+      </td>
+    `;
+
+    tr.querySelector('.btn-edit').addEventListener('click', () => editProduct(docSnap.id, p));
+    tr.querySelector('.btn-delete').addEventListener('click', () => deactivateProduct(docSnap.id, p.name));
+
+    tableBody.appendChild(tr);
+  });
+}
+
+// --- ADD PRODUCT ---
+addBtn.addEventListener('click', async () => {
+  const name = prompt("Nom produit?");
+  const variant = prompt("Variante ? (ex: petit, rouge...)");
+  const imageUrl = prompt("URL image ?");
+  const price_buy = parseFloat(prompt("Prix achat?"));
+  const price_sell = parseFloat(prompt("Prix vente?"));
+  const price_min = parseFloat(prompt("Prix minimum autorisé?"));
+  const stock = parseInt(prompt("Stock initial?"));
+
+  if (!name || !variant || isNaN(price_buy) || isNaN(price_sell) || isNaN(stock) || isNaN(price_min)) {
+    return alert("Valeurs invalides");
+  }
+  if (price_sell < price_min) return alert("Prix vente < prix minimum !");
+
+  const now = Timestamp.now();
+
+  const prodRef = await addDoc(collection(db, "products"), {
+    name,
+    variant,
+    imageUrl: imageUrl || "",
+    category: "default",
+    price_buy,
+    price_sell,
+    price_min,
+    stock_current: stock,
+    stock_alert: 10,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  // --- STOCK MOVEMENT ---
+  await addDoc(collection(db, "stock_movements"), {
+    productId: prodRef.id,
+    type: "IN",
+    quantity: stock,
+    reason: "initial",
+    referenceId: prodRef.id,
+    createdBy: currentUserId,
+    createdAt: now
+  });
+
+  // --- LOG ---
+  await addDoc(collection(db, "logs"), {
+    userId: currentUserId,
+    action: "add_product",
+    targetId: prodRef.id,
+    details: { name, variant, price_buy, price_sell, price_min, stock },
+    createdAt: now
+  });
+
+  loadProducts();
+});
+
+// --- EDIT PRODUCT ---
+async function editProduct(id, data) {
+  const name = prompt("Nom produit?", data.name);
+  const variant = prompt("Variante ?", data.variant || "");
+  const imageUrl = prompt("URL image ?", data.imageUrl || "");
+  const price_buy = parseFloat(prompt("Prix achat?", data.price_buy));
+  const price_sell = parseFloat(prompt("Prix vente?", data.price_sell));
+  const price_min = parseFloat(prompt("Prix minimum autorisé?", data.price_min || data.price_sell));
+
+  if (!name || !variant || isNaN(price_buy) || isNaN(price_sell) || isNaN(price_min)) {
+    return alert("Valeurs invalides");
+  }
+  if (price_sell < price_min) return alert("Prix vente < prix minimum !");
+
+  const now = Timestamp.now();
+
+  await updateDoc(doc(db, "products", id), {
+    name,
+    variant,
+    imageUrl,
+    price_buy,
+    price_sell,
+    price_min,
+    updatedAt: now
+  });
+
+  await addDoc(collection(db, "logs"), {
+    userId: currentUserId,
+    action: "edit_product",
+    targetId: id,
+    details: { name, variant, price_buy, price_sell, price_min },
+    createdAt: now
+  });
+
+  loadProducts();
+}
+
+// --- DEACTIVATE PRODUCT ---
+async function deactivateProduct(id, name) {
+  if (!confirm(`Désactiver ${name} ?`)) return;
+
+  const now = Timestamp.now();
+
+  await updateDoc(doc(db, "products", id), { isActive: false, updatedAt: now });
+  await addDoc(collection(db, "logs"), {
+    userId: currentUserId,
+    action: "deactivate_product",
+    targetId: id,
+    details: { name },
+    createdAt: now
+  });
+
+  loadProducts();
+}
+
+// --- INIT ---
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    alert("Utilisateur non connecté !");
+    window.location.replace("login.html");
+    return;
+  }
+
+  try {
+    currentUserId = user.uid;
+    await checkUser(currentUserId);
+    loadProducts();
+  } catch (e) {
+    alert(e.message);
+    console.error(e);
+  }
+});
