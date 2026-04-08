@@ -115,6 +115,7 @@ function addToCart(productId, data, element) {
       productId,
       name: data.name || "Produit inconnu",
       variant: data.variant || "",
+
       price: data.price_sell || 0,
       price_min: data.price_min,
       price_buy: data.price_buy || 0,
@@ -146,14 +147,11 @@ function updateCartUI() {
   cart.forEach(item => {
     const div = document.createElement('div');
     div.classList.add('cart-item');
-    div.style.display = 'flex';
-    div.style.justifyContent = 'space-between';
-    div.style.alignItems = 'center';
-    div.style.marginBottom = '5px';
 
     // Nom + quantité
     const spanName = document.createElement('span');
     spanName.textContent = `${item.name} ${item.variant ? `(${item.variant})` : ""} x${item.qty}`;
+    spanName.style.flex = "2";
     div.appendChild(spanName);
 
     // Conteneur prix + input + boutons
@@ -161,6 +159,7 @@ function updateCartUI() {
     spanPrice.style.display = 'flex';
     spanPrice.style.gap = '5px';
     spanPrice.style.alignItems = 'center';
+    spanPrice.style.flex = "1";
 
     // Input pour modifier le prix
     const priceInput = document.createElement('input');
@@ -168,11 +167,17 @@ function updateCartUI() {
     priceInput.value = item.price.toFixed(2);
     priceInput.min = item.price_min;
     priceInput.step = '0.01';
-    priceInput.style.width = '70px';
+    priceInput.style.width = '60px';
+    priceInput.style.padding = '2px 4px';
+    priceInput.style.fontSize = '12px';
 
     // Bouton valider prix
     const btnPrice = document.createElement('button');
     btnPrice.textContent = 'OK';
+    btnPrice.style.background = '#0B3D2E';
+    btnPrice.style.color = 'white';
+    btnPrice.style.padding = '2px 6px';
+    btnPrice.style.fontSize = '12px';
     btnPrice.addEventListener('click', () => {
       const val = parseFloat(priceInput.value);
       if (!isNaN(val) && val >= item.price_min) item.price = val;
@@ -195,7 +200,8 @@ function updateCartUI() {
   });
 
   cartTotalDom.textContent = `Total: ${total.toFixed(2)} FC`;
-}
+      }
+
 // --- RECALCUL STOCK CURRENT ---
 async function recalcStockCurrent(productId) {
   const movementsSnap = await getDocs(collection(db, "stock_movements"));
