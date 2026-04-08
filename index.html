@@ -179,7 +179,7 @@
       border: 1px solid #ccc;
       font-size: 12px;
     }
-
+    
     /* espace pour éviter blocage */
 .products {
   padding-bottom: 240px;
@@ -209,7 +209,7 @@
   font-size: 18px;
   cursor: pointer;
   z-index: 1100;
-      }
+}
   </style>
 </head>
 
@@ -272,7 +272,7 @@
 </script>
 
 <script>
-  const cartDom = document.querySelector('.cart');
+const cartDom = document.querySelector('.cart');
 const toggleCartBtn = document.getElementById('toggleCart');
 
 // cacher si clic ailleurs
@@ -291,9 +291,11 @@ toggleCartBtn.addEventListener('click', () => {
   cartDom.classList.toggle('hidden');
 });
 </script>
-  
+
 <script type="module" src="js/index.js"></script>
 <script src="js/nav.js"></script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/receipt.js"></script>
 </body>
 </html>
