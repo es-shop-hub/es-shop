@@ -1,6 +1,6 @@
 // index.js
 import { 
-  db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs, query, orderBy, limit
+  db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs
 } from './firebase.js';
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
@@ -43,18 +43,16 @@ async function loadProducts() {
 
     snap.forEach(docSnap => {
       const p = docSnap.data();
-      if (!p || !p.isActive) return; // ignore inactifs ou null
+      if (!p || !p.isActive) return;
+      if (p.price_min == null) p.price_min = p.price_sell || p.price_buy || 0;
       allProducts.push({ id: docSnap.id, ...p });
     });
 
     if (!allProducts.length) {
       productsContainer.innerHTML = `<p class="no-products">Aucun produit disponible.</p>`;
-      console.warn("Aucun produit actif trouvé dans Firestore !");
     } else {
       renderProducts(allProducts);
     }
-
-    console.log("Produits chargés :", allProducts);
   } catch (err) {
     console.error("Erreur lors du chargement des produits :", err);
     productsContainer.innerHTML = `<p class="no-products">Erreur lors du chargement des produits.</p>`;
@@ -69,7 +67,6 @@ function renderProducts(list) {
     div.classList.add('product', 'fade-in');
     div.dataset.id = p.id;
 
-    // Image sécurisée
     if (p.imageUrl) {
       div.style.backgroundImage = `url(${p.imageUrl})`;
       div.style.backgroundSize = "cover";
@@ -84,16 +81,12 @@ function renderProducts(list) {
         <p>${p.price_sell ? p.price_sell.toFixed(2) : "0.00"}$</p>
       </div>
     `;
-
     div.addEventListener('click', () => addToCart(p.id, p, div));
     productsContainer.appendChild(div);
-
     setTimeout(() => div.classList.add('visible'), 50);
   });
 
-  if (!list.length) {
-    productsContainer.innerHTML = `<p class="no-products">Aucun produit ne correspond à votre recherche.</p>`;
-  }
+  if (!list.length) productsContainer.innerHTML = `<p class="no-products">Aucun produit ne correspond à votre recherche.</p>`;
 }
 
 // --- SEARCH ---
@@ -109,19 +102,26 @@ searchInput.addEventListener('input', () => {
 // --- ADD TO CART ---
 function addToCart(productId, data, element) {
   if (!data || data.stock_current <= 0) return alert("Stock épuisé !");
-  const exist = cart.find(i => i.productId === productId);
+  if (data.price_min == null) data.price_min = data.price_sell || data.price_buy || 0;
 
+  const exist = cart.find(i => i.productId === productId);
   if (exist && exist.qty >= data.stock_current) return alert("Stock max atteint !");
-  if (exist) exist.qty++;
-  else cart.push({
-    name: data.name || "Produit inconnu",
-    variant: data.variant || "",
-    price: data.price_sell || 0,
-    price_min: data.price_min || data.price_buy || 0,
-    qty: 1,
-    productId,
-    price_buy: data.price_buy || 0
-  });
+  
+  if (exist) {
+    exist.qty++;
+    if (exist.price < data.price_min) exist.price = data.price_min;
+  } else {
+    cart.push({
+      productId,
+      name: data.name || "Produit inconnu",
+      variant: data.variant || "",
+      price: data.price_sell || 0,
+      price_min: data.price_min,
+      price_buy: data.price_buy || 0,
+      qty: 1,
+      imageUrl: data.imageUrl || ""
+    });
+  }
 
   element.classList.add('added');
   setTimeout(() => element.classList.remove('added'), 200);
@@ -152,7 +152,6 @@ function updateCartUI() {
     `;
     div.querySelector('button').addEventListener('click', () => removeFromCart(item.productId));
     cartDom.insertBefore(div, cartTotalDom);
-
     total += item.qty * item.price;
   });
 
@@ -165,9 +164,7 @@ async function recalcStockCurrent(productId) {
   let total = 0;
   movementsSnap.forEach(docSnap => {
     const m = docSnap.data();
-    if (m?.productId === productId) {
-      total += (m.type === "IN" ? 1 : -1) * (m.quantity || 0);
-    }
+    if (m?.productId === productId) total += (m.type === "IN" ? 1 : -1) * (m.quantity || 0);
   });
   await updateDoc(doc(db, "products", productId), { stock_current: total });
   return total;
@@ -178,11 +175,7 @@ async function checkStockAlert(productId, currentStock) {
   const productDoc = await getDoc(doc(db, "products", productId));
   const stock_alert = productDoc.data()?.stock_alert || 0;
   if (currentStock <= stock_alert) {
-    await addDoc(collection(db, "stock_alerts"), {
-      productId,
-      currentStock,
-      triggeredAt: Timestamp.now()
-    });
+    await addDoc(collection(db, "stock_alerts"), { productId, currentStock, triggeredAt: Timestamp.now() });
   }
 }
 
@@ -205,7 +198,6 @@ sellBtn.addEventListener('click', async () => {
     const totalAmount = cart.reduce((a,b) => a + b.qty * b.price, 0);
     const totalProfit = cart.reduce((a,b) => a + (b.price - b.price_buy) * b.qty, 0);
 
-    // --- CREATE SALE ---
     const saleRef = await addDoc(collection(db, "sales"), {
       sellerId: currentUserId,
       total_amount: totalAmount,
@@ -214,16 +206,6 @@ sellBtn.addEventListener('click', async () => {
       createdAt: saleDate
     });
 
-    const saleDataForReceipt = {
-      clientName: "",
-      createdAt: saleDate.toDate(),
-      items: cart,
-      total_amount: totalAmount,
-      notes: ""
-    };
-    document.dispatchEvent(new CustomEvent('sale-created', { detail: saleDataForReceipt }));
-
-    // --- CREATE SALE ITEMS & STOCK MOVEMENTS ---
     for (const item of cart) {
       const prodRef = doc(db, "products", item.productId);
       const prodSnap = await getDoc(prodRef);
@@ -237,6 +219,7 @@ sellBtn.addEventListener('click', async () => {
         productId: item.productId,
         quantity: item.qty,
         price: item.price,
+        price_min: item.price_min,
         profit: (item.price - item.price_buy) * item.qty
       });
 
@@ -254,7 +237,6 @@ sellBtn.addEventListener('click', async () => {
       await checkStockAlert(item.productId, newStock);
     }
 
-    // --- LOG ---
     await addDoc(collection(db, "logs"), {
       userId: currentUserId,
       action: "create_sale",
@@ -263,7 +245,6 @@ sellBtn.addEventListener('click', async () => {
       createdAt: Timestamp.now()
     });
 
-    // --- RESET UI ---
     cart = [];
     updateCartUI();
     saleDateInput.value = "";
@@ -271,7 +252,6 @@ sellBtn.addEventListener('click', async () => {
     await loadProducts();
 
     alert(`Vente enregistrée ! ID: ${saleRef.id}`);
-
   } catch (e) {
     console.error("Erreur vente :", e);
     alert(e.message || "Erreur lors de la vente !");
