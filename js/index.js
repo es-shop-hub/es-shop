@@ -78,7 +78,7 @@ function renderProducts(list) {
         <h4>${p.name || "Produit inconnu"}</h4>
         ${p.variant ? `<div class="variant">${p.variant}</div>` : ""}
         <p>Stock: ${p.stock_current ?? 0}</p>
-        <p>${p.price_sell ? p.price_sell.toFixed(2) : "0.00"}$</p>
+        <p>${p.price_sell ? p.price_sell.toFixed(2) : "0.00"}FC</p>
       </div>
     `;
     div.addEventListener('click', () => addToCart(p.id, p, div));
@@ -146,17 +146,49 @@ function updateCartUI() {
   cart.forEach(item => {
     const div = document.createElement('div');
     div.classList.add('cart-item');
-    div.innerHTML = `
-      <span>${item.name} ${item.variant ? `(${item.variant})` : ""} x${item.qty}</span>
-      <span>${(item.qty * item.price).toFixed(2)}$ <button data-id="${item.productId}">x</button></span>
-    `;
-    div.querySelector('button').addEventListener('click', () => removeFromCart(item.productId));
+
+    // Nom + quantité
+    const spanName = document.createElement('span');
+    spanName.textContent = `${item.name} ${item.variant ? `(${item.variant})` : ""} x${item.qty}`;
+    div.appendChild(spanName);
+
+    // Conteneur prix + input
+    const spanPrice = document.createElement('span');
+
+    const priceInput = document.createElement('input');
+    priceInput.type = 'number';
+    priceInput.value = item.price.toFixed(2);
+    priceInput.min = item.price_min;
+    priceInput.step = '0.01';
+    priceInput.style.width = '70px';
+
+    // Bouton valider prix
+    const btnPrice = document.createElement('button');
+    btnPrice.textContent = 'OK';
+    btnPrice.addEventListener('click', () => {
+      const val = parseFloat(priceInput.value);
+      if (!isNaN(val) && val >= item.price_min) item.price = val;
+      updateCartUI();
+    });
+
+    spanPrice.appendChild(priceInput);
+    spanPrice.appendChild(btnPrice);
+
+    // Bouton retirer item
+    const btnRemove = document.createElement('button');
+    btnRemove.textContent = 'x';
+    btnRemove.addEventListener('click', () => removeFromCart(item.productId));
+
+    spanPrice.appendChild(btnRemove);
+    div.appendChild(spanPrice);
+
     cartDom.insertBefore(div, cartTotalDom);
+
     total += item.qty * item.price;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
-}
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)}FC`;
+    }
 
 // --- RECALCUL STOCK CURRENT ---
 async function recalcStockCurrent(productId) {
