@@ -165,8 +165,8 @@ async function loadStock() {
     tr.innerHTML = `
       <td>${p.name} ${p.variant ? "(" + p.variant + ")" : ""}</td>
       <td>${p.stock_current}</td>
-      <td>${p.price_buy.toFixed(2)} $</td>
-      <td>${(p.stock_current * p.price_buy).toFixed(2)} $</td>
+      <td>${p.price_buy.toFixed(2)} FC</td>
+      <td>${(p.stock_current * p.price_buy).toFixed(2)} FC</td>
       <td><button onclick="manualUpdate('${docSnap.id}')">Modifier</button></td>
     `;
     stockTableBody.appendChild(tr);
