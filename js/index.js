@@ -4,7 +4,7 @@ import {
 } from './firebase.js';
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-// --- OFFLINE ---
+// --- OFFLINE PERSISTENCE ---
 enableIndexedDbPersistence(db).catch(err => console.warn("Offline persistence non disponible :", err));
 
 // --- DOM ---
@@ -37,17 +37,28 @@ async function checkUser(uid) {
 
 // --- LOAD PRODUCTS ---
 async function loadProducts() {
-  const snap = await getDocs(collection(db, "products"));
-  productsContainer.innerHTML = "";
-  allProducts = [];
+  try {
+    const snap = await getDocs(collection(db, "products"));
+    allProducts = [];
 
-  snap.forEach(docSnap => {
-    const p = docSnap.data();
-    if (!p.isActive) return;
-    allProducts.push({ id: docSnap.id, ...p });
-  });
+    snap.forEach(docSnap => {
+      const p = docSnap.data();
+      if (!p || !p.isActive) return; // ignore inactifs ou null
+      allProducts.push({ id: docSnap.id, ...p });
+    });
 
-  renderProducts(allProducts);
+    if (!allProducts.length) {
+      productsContainer.innerHTML = `<p class="no-products">Aucun produit disponible.</p>`;
+      console.warn("Aucun produit actif trouvé dans Firestore !");
+    } else {
+      renderProducts(allProducts);
+    }
+
+    console.log("Produits chargés :", allProducts);
+  } catch (err) {
+    console.error("Erreur lors du chargement des produits :", err);
+    productsContainer.innerHTML = `<p class="no-products">Erreur lors du chargement des produits.</p>`;
+  }
 }
 
 // --- RENDER PRODUCTS ---
@@ -58,6 +69,7 @@ function renderProducts(list) {
     div.classList.add('product', 'fade-in');
     div.dataset.id = p.id;
 
+    // Image sécurisée
     if (p.imageUrl) {
       div.style.backgroundImage = `url(${p.imageUrl})`;
       div.style.backgroundSize = "cover";
@@ -66,10 +78,10 @@ function renderProducts(list) {
 
     div.innerHTML = `
       <div class="product-content">
-        <h4>${p.name}</h4>
+        <h4>${p.name || "Produit inconnu"}</h4>
         ${p.variant ? `<div class="variant">${p.variant}</div>` : ""}
-        <p>Stock: ${p.stock_current}</p>
-        <p>${p.price_sell.toFixed(2)}$</p>
+        <p>Stock: ${p.stock_current ?? 0}</p>
+        <p>${p.price_sell ? p.price_sell.toFixed(2) : "0.00"}$</p>
       </div>
     `;
 
@@ -78,13 +90,17 @@ function renderProducts(list) {
 
     setTimeout(() => div.classList.add('visible'), 50);
   });
+
+  if (!list.length) {
+    productsContainer.innerHTML = `<p class="no-products">Aucun produit ne correspond à votre recherche.</p>`;
+  }
 }
 
 // --- SEARCH ---
 searchInput.addEventListener('input', () => {
   const value = searchInput.value.toLowerCase();
   const filtered = allProducts.filter(p =>
-    p.name.toLowerCase().includes(value) ||
+    (p.name && p.name.toLowerCase().includes(value)) ||
     (p.variant && p.variant.toLowerCase().includes(value))
   );
   renderProducts(filtered);
@@ -92,19 +108,19 @@ searchInput.addEventListener('input', () => {
 
 // --- ADD TO CART ---
 function addToCart(productId, data, element) {
-  if (data.stock_current <= 0) return alert("Stock épuisé !");
+  if (!data || data.stock_current <= 0) return alert("Stock épuisé !");
   const exist = cart.find(i => i.productId === productId);
 
   if (exist && exist.qty >= data.stock_current) return alert("Stock max atteint !");
   if (exist) exist.qty++;
   else cart.push({
-    name: data.name,
+    name: data.name || "Produit inconnu",
     variant: data.variant || "",
-    price: data.price_sell,
-    price_min: data.price_min || data.price_buy,
+    price: data.price_sell || 0,
+    price_min: data.price_min || data.price_buy || 0,
     qty: 1,
     productId,
-    price_buy: data.price_buy
+    price_buy: data.price_buy || 0
   });
 
   element.classList.add('added');
@@ -149,8 +165,8 @@ async function recalcStockCurrent(productId) {
   let total = 0;
   movementsSnap.forEach(docSnap => {
     const m = docSnap.data();
-    if (m.productId === productId) {
-      total += (m.type === "IN" ? 1 : -1) * m.quantity;
+    if (m?.productId === productId) {
+      total += (m.type === "IN" ? 1 : -1) * (m.quantity || 0);
     }
   });
   await updateDoc(doc(db, "products", productId), { stock_current: total });
@@ -160,7 +176,7 @@ async function recalcStockCurrent(productId) {
 // --- CHECK STOCK ALERT ---
 async function checkStockAlert(productId, currentStock) {
   const productDoc = await getDoc(doc(db, "products", productId));
-  const stock_alert = productDoc.data().stock_alert || 0;
+  const stock_alert = productDoc.data()?.stock_alert || 0;
   if (currentStock <= stock_alert) {
     await addDoc(collection(db, "stock_alerts"), {
       productId,
@@ -180,12 +196,11 @@ sellBtn.addEventListener('click', async () => {
 
     let saleDate = Timestamp.now();
     if (manualDateCheckbox.checked && saleDateInput.value) {
-      saleDate = Timestamp.fromDate(new Date(saleDateInput.value));
+      const d = new Date(saleDateInput.value);
+      if (!isNaN(d)) saleDate = Timestamp.fromDate(d);
     }
 
-    cart.forEach(item => {
-      if (item.price < item.price_min) item.price = item.price_min;
-    });
+    cart.forEach(item => { if (item.price < item.price_min) item.price = item.price_min; });
 
     const totalAmount = cart.reduce((a,b) => a + b.qty * b.price, 0);
     const totalProfit = cart.reduce((a,b) => a + (b.price - b.price_buy) * b.qty, 0);
@@ -214,7 +229,7 @@ sellBtn.addEventListener('click', async () => {
       const prodSnap = await getDoc(prodRef);
       if (!prodSnap.exists()) continue;
 
-      const currentStock = prodSnap.data().stock_current || 0;
+      const currentStock = prodSnap.data()?.stock_current || 0;
       if (currentStock < item.qty) throw new Error(`Stock insuffisant pour ${item.name}`);
 
       await addDoc(collection(db, "sale_items"), {
@@ -271,7 +286,6 @@ async function cancelSale(saleId) {
 
   await updateDoc(saleRef, { status: "cancelled" });
 
-  // Ajouter mouvements correction pour chaque item
   const itemsSnap = await getDocs(collection(db, "sale_items"));
   for (const itemDoc of itemsSnap.docs) {
     const item = itemDoc.data();
@@ -311,7 +325,8 @@ onAuthStateChanged(auth, async (user) => {
     await checkUser(currentUserId);
     await loadProducts();
   } catch (e) {
-    console.error(e);
+    console.error("Erreur initialisation :", e);
+    productsContainer.innerHTML = `<p class="no-products">Impossible de charger les produits.</p>`;
     alert(e.message);
   }
 });
