@@ -146,15 +146,23 @@ function updateCartUI() {
   cart.forEach(item => {
     const div = document.createElement('div');
     div.classList.add('cart-item');
+    div.style.display = 'flex';
+    div.style.justifyContent = 'space-between';
+    div.style.alignItems = 'center';
+    div.style.marginBottom = '5px';
 
     // Nom + quantité
     const spanName = document.createElement('span');
     spanName.textContent = `${item.name} ${item.variant ? `(${item.variant})` : ""} x${item.qty}`;
     div.appendChild(spanName);
 
-    // Conteneur prix + input
+    // Conteneur prix + input + boutons
     const spanPrice = document.createElement('span');
+    spanPrice.style.display = 'flex';
+    spanPrice.style.gap = '5px';
+    spanPrice.style.alignItems = 'center';
 
+    // Input pour modifier le prix
     const priceInput = document.createElement('input');
     priceInput.type = 'number';
     priceInput.value = item.price.toFixed(2);
@@ -171,14 +179,13 @@ function updateCartUI() {
       updateCartUI();
     });
 
-    spanPrice.appendChild(priceInput);
-    spanPrice.appendChild(btnPrice);
-
     // Bouton retirer item
     const btnRemove = document.createElement('button');
     btnRemove.textContent = 'x';
     btnRemove.addEventListener('click', () => removeFromCart(item.productId));
 
+    spanPrice.appendChild(priceInput);
+    spanPrice.appendChild(btnPrice);
     spanPrice.appendChild(btnRemove);
     div.appendChild(spanPrice);
 
@@ -187,9 +194,8 @@ function updateCartUI() {
     total += item.qty * item.price;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)}FC`;
-    }
-
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)} FC`;
+}
 // --- RECALCUL STOCK CURRENT ---
 async function recalcStockCurrent(productId) {
   const movementsSnap = await getDocs(collection(db, "stock_movements"));
