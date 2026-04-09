@@ -164,8 +164,12 @@ function updateCartUI() {
     // Input pour modifier le prix
     const priceInput = document.createElement('input');
     priceInput.type = 'number';
+
+    // --- sécurisation price_min ---
+    const minPrice = (item.price_min !== undefined && item.price_min !== null) ? item.price_min : item.price_sell;
+
     priceInput.value = item.price.toFixed(2);
-    priceInput.min = item.price_min;
+    priceInput.min = minPrice;
     priceInput.step = '0.01';
     priceInput.style.width = '60px';
     priceInput.style.padding = '2px 4px';
@@ -180,7 +184,11 @@ function updateCartUI() {
     btnPrice.style.fontSize = '12px';
     btnPrice.addEventListener('click', () => {
       const val = parseFloat(priceInput.value);
-      if (!isNaN(val) && val >= item.price_min) item.price = val;
+
+      if (isNaN(val)) return alert("Prix invalide !");
+      if (val < minPrice) return alert(`Prix trop bas ! Minimum autorisé : ${minPrice}`);
+
+      item.price = val;
       updateCartUI();
     });
 
@@ -199,8 +207,9 @@ function updateCartUI() {
     total += item.qty * item.price;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)} FC`;
-      }
+  // Optionnel : afficher total
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
+}
 
 // --- RECALCUL STOCK CURRENT ---
 async function recalcStockCurrent(productId) {
