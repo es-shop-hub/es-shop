@@ -69,7 +69,12 @@ function renderProducts(list) {
   list.forEach(p => {
     const div = document.createElement('div');
     div.className = 'product fade-in';
+    const img = p.imageUrl || "default.png"; // fallback propre
 
+div.style.backgroundImage = `url(${img})`;
+div.style.backgroundSize = "cover";
+div.style.backgroundPosition = "center";
+    
     div.innerHTML = `
       <div class="product-content">
         <h4>${p.name}</h4>
@@ -147,9 +152,11 @@ function updateCartUI() {
     const controls = document.createElement('span');
 
     const input = document.createElement('input');
-    input.type = "number";
-    input.value = item.price;
-    input.min = item.price_min;
+input.type = "number";
+input.value = item.price;
+input.min = item.price_min;
+input.style.width = "50px";
+input.style.marginRight = "5px";
 
     const ok = document.createElement('button');
     ok.textContent = "OK";
