@@ -1,9 +1,7 @@
-import { jsPDF } from "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-
 // --- CONFIG ---
-const SHOP_NAME = "NOM DE LA BOUTIQUE";
-const SHOP_ADDRESS = "Adresse : XXXXX";
-const SHOP_PHONE = "Tel : XXXXX";
+const SHOP_NAME = "Es-Shop";
+const SHOP_ADDRESS = "Adresse : Butembo-Rughenda";
+const SHOP_PHONE = "Tel : +243840344307";
 const logoUrl = "https://example.com/logo.png";
 
 const MAX_ITEMS_PER_RECEIPT = 18;
