@@ -1,11 +1,13 @@
-// index.js
+// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE
+
 import { 
-  db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs
+  db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs, query, where
 } from './firebase.js';
+
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-// --- OFFLINE PERSISTENCE ---
-enableIndexedDbPersistence(db).catch(err => console.warn("Offline persistence non disponible :", err));
+// --- OFFLINE ---
+enableIndexedDbPersistence(db).catch(() => {});
 
 // --- DOM ---
 const productsContainer = document.getElementById('productsContainer');
@@ -16,242 +18,221 @@ const manualDateCheckbox = document.getElementById('manualDate');
 const saleDateInput = document.getElementById('saleDate');
 const searchInput = document.getElementById('searchInput');
 
-// --- CART ---
+// --- STATE ---
 let cart = [];
 let allProducts = [];
+let isProcessingSale = false;   // 🔒 LOCK PRINCIPAL
+let lastSaleTime = 0;           // 🔒 ANTI SPAM
 
 // --- AUTH ---
 const auth = getAuth();
 let currentUserId = null;
 
-// --- CHECK USER ---
+// --- SECURITY ---
 async function checkUser(uid) {
   const userDoc = await getDoc(doc(db, "users", uid));
   if (!userDoc.exists()) throw new Error("Utilisateur inconnu");
+
   const data = userDoc.data();
-  if (!data.isActive || (data.role !== "admin" && data.role !== "seller")) {
+  if (!data.isActive || !["admin","seller"].includes(data.role)) {
     throw new Error("Accès refusé");
   }
+
   return data;
 }
 
 // --- LOAD PRODUCTS ---
 async function loadProducts() {
-  try {
-    const snap = await getDocs(collection(db, "products"));
-    allProducts = [];
+  const snap = await getDocs(collection(db, "products"));
+  allProducts = [];
 
-    snap.forEach(docSnap => {
-      const p = docSnap.data();
-      if (!p || !p.isActive) return;
-      if (p.price_min == null) p.price_min = p.price_sell || p.price_buy || 0;
-      allProducts.push({ id: docSnap.id, ...p });
+  snap.forEach(docSnap => {
+    const p = docSnap.data();
+    if (!p?.isActive) return;
+
+    const price_min = p.price_min ?? p.price_sell ?? p.price_buy ?? 0;
+
+    allProducts.push({
+      id: docSnap.id,
+      ...p,
+      price_min
     });
+  });
 
-    if (!allProducts.length) {
-      productsContainer.innerHTML = `<p class="no-products">Aucun produit disponible.</p>`;
-    } else {
-      renderProducts(allProducts);
-    }
-  } catch (err) {
-    console.error("Erreur lors du chargement des produits :", err);
-    productsContainer.innerHTML = `<p class="no-products">Erreur lors du chargement des produits.</p>`;
-  }
+  renderProducts(allProducts);
 }
 
-// --- RENDER PRODUCTS ---
+// --- RENDER ---
 function renderProducts(list) {
   productsContainer.innerHTML = "";
+
   list.forEach(p => {
     const div = document.createElement('div');
-    div.classList.add('product', 'fade-in');
-    div.dataset.id = p.id;
-
-    if (p.imageUrl) {
-      div.style.backgroundImage = `url(${p.imageUrl})`;
-      div.style.backgroundSize = "cover";
-      div.style.backgroundPosition = "center";
-    }
+    div.className = 'product fade-in';
 
     div.innerHTML = `
       <div class="product-content">
-        <h4>${p.name || "Produit inconnu"}</h4>
-        ${p.variant ? `<div class="variant">${p.variant}</div>` : ""}
+        <h4>${p.name}</h4>
+        ${p.variant ? `<div>${p.variant}</div>` : ""}
         <p>Stock: ${p.stock_current ?? 0}</p>
-        <p>${p.price_sell ? p.price_sell.toFixed(2) : "0.00"}FC</p>
+        <p>${(p.price_sell || 0).toFixed(2)}$</p>
       </div>
     `;
-    div.addEventListener('click', () => addToCart(p.id, p, div));
+
+    div.onclick = () => addToCart(p);
     productsContainer.appendChild(div);
+
     setTimeout(() => div.classList.add('visible'), 50);
   });
-
-  if (!list.length) productsContainer.innerHTML = `<p class="no-products">Aucun produit ne correspond à votre recherche.</p>`;
 }
 
 // --- SEARCH ---
 searchInput.addEventListener('input', () => {
-  const value = searchInput.value.toLowerCase();
-  const filtered = allProducts.filter(p =>
-    (p.name && p.name.toLowerCase().includes(value)) ||
-    (p.variant && p.variant.toLowerCase().includes(value))
+  const v = searchInput.value.toLowerCase();
+  renderProducts(
+    allProducts.filter(p =>
+      p.name.toLowerCase().includes(v) ||
+      (p.variant || "").toLowerCase().includes(v)
+    )
   );
-  renderProducts(filtered);
 });
 
-// --- ADD TO CART ---
-function addToCart(productId, data, element) {
-  if (!data || data.stock_current <= 0) return alert("Stock épuisé !");
-  if (data.price_min == null) data.price_min = data.price_sell || data.price_buy || 0;
+// --- CART ---
+function addToCart(p) {
+  if (p.stock_current <= 0) return alert("Stock épuisé");
 
-  const exist = cart.find(i => i.productId === productId);
-  if (exist && exist.qty >= data.stock_current) return alert("Stock max atteint !");
-  
+  const exist = cart.find(i => i.productId === p.id);
+
   if (exist) {
+    if (exist.qty >= p.stock_current) return alert("Stock max atteint");
     exist.qty++;
-    if (exist.price < data.price_min) exist.price = data.price_min;
   } else {
     cart.push({
-      productId,
-      name: data.name || "Produit inconnu",
-      variant: data.variant || "",
-
-      price: data.price_sell || 0,
-      price_min: data.price_min,
-      price_buy: data.price_buy || 0,
-      qty: 1,
-      imageUrl: data.imageUrl || ""
+      productId: p.id,
+      name: p.name,
+      variant: p.variant || "",
+      price: p.price_sell,
+      price_min: p.price_min,
+      price_buy: p.price_buy || 0,
+      qty: 1
     });
   }
 
-  element.classList.add('added');
-  setTimeout(() => element.classList.remove('added'), 200);
   updateCartUI();
 }
 
-// --- REMOVE FROM CART ---
-function removeFromCart(productId) {
-  const index = cart.findIndex(i => i.productId === productId);
-  if (index !== -1) {
-    cart[index].qty--;
-    if (cart[index].qty <= 0) cart.splice(index, 1);
+function removeFromCart(id) {
+  const i = cart.findIndex(x => x.productId === id);
+  if (i !== -1) {
+    cart[i].qty--;
+    if (cart[i].qty <= 0) cart.splice(i,1);
   }
   updateCartUI();
 }
 
-// --- UPDATE CART UI ---
+// --- CART UI ---
 function updateCartUI() {
-  cartDom.querySelectorAll('.cart-item').forEach(item => item.remove());
+  cartDom.querySelectorAll('.cart-item').forEach(e => e.remove());
+
   let total = 0;
 
   cart.forEach(item => {
+
     const div = document.createElement('div');
-    div.classList.add('cart-item');
+    div.className = 'cart-item';
 
-    // Nom + quantité
-    const spanName = document.createElement('span');
-    spanName.textContent = `${item.name} ${item.variant ? `(${item.variant})` : ""} x${item.qty}`;
-    spanName.style.flex = "2";
-    div.appendChild(spanName);
+    const name = document.createElement('span');
+    name.textContent = `${item.name} x${item.qty}`;
 
-    // Conteneur prix + input + boutons
-    const spanPrice = document.createElement('span');
-    spanPrice.style.display = 'flex';
-    spanPrice.style.gap = '5px';
-    spanPrice.style.alignItems = 'center';
-    spanPrice.style.flex = "1";
+    const controls = document.createElement('span');
 
-    // Input pour modifier le prix
-    const priceInput = document.createElement('input');
-    priceInput.type = 'number';
+    const input = document.createElement('input');
+    input.type = "number";
+    input.value = item.price;
+    input.min = item.price_min;
 
-    // --- sécurisation price_min ---
-    const minPrice = (item.price_min !== undefined && item.price_min !== null) ? item.price_min : item.price_sell;
+    const ok = document.createElement('button');
+    ok.textContent = "OK";
 
-    priceInput.value = item.price.toFixed(2);
-    priceInput.min = minPrice;
-    priceInput.step = '0.01';
-    priceInput.style.width = '60px';
-    priceInput.style.padding = '2px 4px';
-    priceInput.style.fontSize = '12px';
+    ok.onclick = () => {
+      const val = parseFloat(input.value);
 
-    // Bouton valider prix
-    const btnPrice = document.createElement('button');
-    btnPrice.textContent = 'OK';
-    btnPrice.style.background = '#0B3D2E';
-    btnPrice.style.color = 'white';
-    btnPrice.style.padding = '2px 6px';
-    btnPrice.style.fontSize = '12px';
-    btnPrice.addEventListener('click', () => {
-      const val = parseFloat(priceInput.value);
-
-      if (isNaN(val)) return alert("Prix invalide !");
-      if (val < minPrice) return alert(`Prix trop bas ! Minimum autorisé : ${minPrice}`);
+      if (isNaN(val)) return alert("Prix invalide");
+      if (val < item.price_min) return alert(`Minimum: ${item.price_min}`);
 
       item.price = val;
       updateCartUI();
-    });
+    };
 
-    // Bouton retirer item
-    const btnRemove = document.createElement('button');
-    btnRemove.textContent = 'x';
-    btnRemove.addEventListener('click', () => removeFromCart(item.productId));
+    const del = document.createElement('button');
+    del.textContent = "x";
+    del.onclick = () => removeFromCart(item.productId);
 
-    spanPrice.appendChild(priceInput);
-    spanPrice.appendChild(btnPrice);
-    spanPrice.appendChild(btnRemove);
-    div.appendChild(spanPrice);
+    controls.append(input, ok, del);
+    div.append(name, controls);
 
     cartDom.insertBefore(div, cartTotalDom);
 
-    total += item.qty * item.price;
+    total += item.price * item.qty;
   });
 
-  // Optionnel : afficher total
   cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
 }
 
-// --- RECALCUL STOCK CURRENT ---
-async function recalcStockCurrent(productId) {
-  const movementsSnap = await getDocs(collection(db, "stock_movements"));
+// --- STOCK RECALC ---
+async function recalcStock(productId) {
+  const snap = await getDocs(
+    query(collection(db,"stock_movements"), where("productId","==",productId))
+  );
+
   let total = 0;
-  movementsSnap.forEach(docSnap => {
-    const m = docSnap.data();
-    if (m?.productId === productId) total += (m.type === "IN" ? 1 : -1) * (m.quantity || 0);
+
+  snap.forEach(d => {
+    const m = d.data();
+    if (m.type === "IN") total += m.quantity;
+    else if (m.type === "OUT") total -= m.quantity;
   });
-  await updateDoc(doc(db, "products", productId), { stock_current: total });
+
+  await updateDoc(doc(db,"products",productId), {
+    stock_current: total
+  });
+
   return total;
 }
 
-// --- CHECK STOCK ALERT ---
-async function checkStockAlert(productId, currentStock) {
-  const productDoc = await getDoc(doc(db, "products", productId));
-  const stock_alert = productDoc.data()?.stock_alert || 0;
-  if (currentStock <= stock_alert) {
-    await addDoc(collection(db, "stock_alerts"), { productId, currentStock, triggeredAt: Timestamp.now() });
-  }
-}
-
-// --- SELL PROCESS ---
+// --- SELL (ANTI DOUBLE) ---
 sellBtn.addEventListener('click', async () => {
-  if (!currentUserId) return alert("Utilisateur non connecté !");
-  if (!cart.length) return alert("Panier vide !");
+
+  // 🔒 LOCK HARD
+  if (isProcessingSale) return;
+
+  const nowTime = Date.now();
+  if (nowTime - lastSaleTime < 1500) return alert("Attends un peu...");
+  lastSaleTime = nowTime;
+
+  if (!cart.length) return alert("Panier vide");
+
+  isProcessingSale = true;
+  sellBtn.disabled = true;
 
   try {
     await checkUser(currentUserId);
 
-    let saleDate = Timestamp.now();
-    if (manualDateCheckbox.checked && saleDateInput.value) {
-      const d = new Date(saleDateInput.value);
-      if (!isNaN(d)) saleDate = Timestamp.fromDate(d);
+    // 🔥 sécurité prix
+    for (const item of cart) {
+      if (item.price < item.price_min) {
+        throw new Error(`Prix < minimum (${item.name})`);
+      }
     }
 
-    cart.forEach(item => { if (item.price < item.price_min) item.price = item.price_min; });
+    const saleDate = manualDateCheckbox.checked && saleDateInput.value
+      ? Timestamp.fromDate(new Date(saleDateInput.value))
+      : Timestamp.now();
 
-    const totalAmount = cart.reduce((a,b) => a + b.qty * b.price, 0);
-    const totalProfit = cart.reduce((a,b) => a + (b.price - b.price_buy) * b.qty, 0);
+    const totalAmount = cart.reduce((a,b)=>a+b.qty*b.price,0);
+    const totalProfit = cart.reduce((a,b)=>a+(b.price-b.price_buy)*b.qty,0);
 
-    const saleRef = await addDoc(collection(db, "sales"), {
+    const saleRef = await addDoc(collection(db,"sales"), {
       sellerId: currentUserId,
       total_amount: totalAmount,
       total_profit: totalProfit,
@@ -259,15 +240,18 @@ sellBtn.addEventListener('click', async () => {
       createdAt: saleDate
     });
 
-    for (const item of cart) {
-      const prodRef = doc(db, "products", item.productId);
-      const prodSnap = await getDoc(prodRef);
-      if (!prodSnap.exists()) continue;
+    const soldItems = [...cart];
 
-      const currentStock = prodSnap.data()?.stock_current || 0;
-      if (currentStock < item.qty) throw new Error(`Stock insuffisant pour ${item.name}`);
+    for (const item of soldItems) {
 
-      await addDoc(collection(db, "sale_items"), {
+      const prod = await getDoc(doc(db,"products",item.productId));
+      if (!prod.exists()) throw new Error("Produit supprimé");
+
+      if ((prod.data().stock_current || 0) < item.qty) {
+        throw new Error(`Stock insuffisant (${item.name})`);
+      }
+
+      await addDoc(collection(db,"sale_items"), {
         saleId: saleRef.id,
         productId: item.productId,
         quantity: item.qty,
@@ -276,7 +260,7 @@ sellBtn.addEventListener('click', async () => {
         profit: (item.price - item.price_buy) * item.qty
       });
 
-      await addDoc(collection(db, "stock_movements"), {
+      await addDoc(collection(db,"stock_movements"), {
         productId: item.productId,
         type: "OUT",
         quantity: item.qty,
@@ -286,80 +270,44 @@ sellBtn.addEventListener('click', async () => {
         createdAt: saleDate
       });
 
-      const newStock = await recalcStockCurrent(item.productId);
-      await checkStockAlert(item.productId, newStock);
+      await recalcStock(item.productId);
     }
-
-    await addDoc(collection(db, "logs"), {
-      userId: currentUserId,
-      action: "create_sale",
-      targetId: saleRef.id,
-      details: { items: cart },
-      createdAt: Timestamp.now()
-    });
 
     cart = [];
     updateCartUI();
-    saleDateInput.value = "";
-    manualDateCheckbox.checked = false;
     await loadProducts();
 
-    alert(`Vente enregistrée ! ID: ${saleRef.id}`);
+    if (window.generateReceipt) {
+      window.generateReceipt({
+        saleId: saleRef.id,
+        items: soldItems,
+        total: totalAmount,
+        date: new Date()
+      });
+    }
+
+    alert("Vente OK");
+
   } catch (e) {
-    console.error("Erreur vente :", e);
-    alert(e.message || "Erreur lors de la vente !");
+    console.error(e);
+    alert(e.message);
+  } finally {
+    // 🔒 UNLOCK (CRITIQUE)
+    isProcessingSale = false;
+    sellBtn.disabled = false;
   }
 });
 
-// --- CANCEL SALE ---
-async function cancelSale(saleId) {
-  const saleRef = doc(db, "sales", saleId);
-  const saleSnap = await getDoc(saleRef);
-  if (!saleSnap.exists()) throw new Error("Vente introuvable");
-
-  await updateDoc(saleRef, { status: "cancelled" });
-
-  const itemsSnap = await getDocs(collection(db, "sale_items"));
-  for (const itemDoc of itemsSnap.docs) {
-    const item = itemDoc.data();
-    if (item.saleId === saleId) {
-      await addDoc(collection(db, "stock_movements"), {
-        productId: item.productId,
-        type: "IN",
-        quantity: item.quantity,
-        reason: "correction",
-        referenceId: saleId,
-        createdBy: currentUserId,
-        createdAt: Timestamp.now()
-      });
-      await recalcStockCurrent(item.productId);
-    }
-  }
-
-  await addDoc(collection(db, "logs"), {
-    userId: currentUserId,
-    action: "cancel_sale",
-    targetId: saleId,
-    details: {},
-    createdAt: Timestamp.now()
-  });
-}
-
 // --- INIT ---
 onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    alert("Utilisateur non connecté !");
-    window.location.replace("login.html");
-    return;
-  }
+  if (!user) return location.replace("login.html");
 
   currentUserId = user.uid;
+
   try {
     await checkUser(currentUserId);
-    await loadProducts();
+    loadProducts();
   } catch (e) {
-    console.error("Erreur initialisation :", e);
-    productsContainer.innerHTML = `<p class="no-products">Impossible de charger les produits.</p>`;
     alert(e.message);
   }
 });
