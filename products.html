@@ -156,6 +156,59 @@ nav div.active {
   justify-content: center;
   margin: 20px 0;
 }
+  .debts-btn{
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #0B5FFF;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.debts-btn:hover{
+  background: #0847c2;
+  }
+  .auth-links{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.auth-links .btn{
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: 0.2s ease;
+  border: 1px solid transparent;
+}
+
+/* Bouton connexion */
+.auth-links .btn:first-child{
+  background: transparent;
+  color: #0B5FFF;
+  border-color: #0B5FFF;
+}
+
+.auth-links .btn:first-child:hover{
+  background: #0B5FFF;
+  color: white;
+}
+
+/* Bouton inscription */
+.auth-links .btn:last-child{
+  background: #0B5FFF;
+  color: white;
+}
+
+.auth-links .btn:last-child:hover{
+  background: #0847c2;
+  }
 </style>
 </head>
 
@@ -165,7 +218,7 @@ nav div.active {
   <h3>ES Shop - Produits</h3>
   <div class="status">● Online</div>
 </header>
-
+<a href="debts.html" class="debts-btn">Dettes</a>
 <div class="auth-links">
   <a href="login.html" class="btn">Connexion</a>
   <a href="signup.html" class="btn">Inscription</a>
