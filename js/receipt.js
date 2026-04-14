@@ -151,4 +151,6 @@ window.generateReceipt = async function(data) {
   });
 
   doc.save(`recu_${data.saleId}.pdf`);
+  doc.autoPrint();
+window.open(doc.output('bloburl'), '_blank');
 };
