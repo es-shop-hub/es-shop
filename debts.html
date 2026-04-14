@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion des Dettes</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #f5f6fa;
+  color: #2f3640;
+}
+
+h1 {
+  background: #111;
+  color: #fff;
+  padding: 15px;
+  text-align: center;
+  margin: 0;
+}
+
+section {
+  background: #fff;
+  margin: 20px;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* FORM */
+form {
+  display: grid;
+  gap: 10px;
+}
+
+input, select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #dcdde1;
+  font-size: 14px;
+}
+
+button {
+  background: #0B5FFF;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  background: #084ed1;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th, td {
+  padding: 10px;
+  border: 1px solid #dcdde1;
+  text-align: left;
+}
+
+th {
+  background: #0B5FFF;
+  color: #fff;
+}
+
+tr:nth-child(even) {
+  background: #f1f2f6;
+}
+
+/* STATUS COLORS */
+td:nth-child(6) {
+  font-weight: bold;
+}
+
+td:nth-child(6):contains("paid") {
+  color: green;
+}
+
+td:nth-child(6):contains("partial") {
+  color: orange;
+}
+
+td:nth-child(6):contains("pending") {
+  color: red;
+}
+</style>
+</head>
+<body>
+
+<h1>Dettes</h1>
+
+<!-- ===== FORM ===== -->
+<section>
+  <h2>Créer une dette</h2>
+
+  <form id="debtForm">
+
+    <label>Type :</label>
+    <select id="type" required>
+      <option value="client">Client</option>
+      <option value="supplier">Fournisseur</option>
+    </select>
+
+    <label>Nom :</label>
+    <input type="text" id="name" required>
+
+    <label>Téléphone :</label>
+    <input type="text" id="phone">
+
+    <label>Montant total :</label>
+    <input type="number" id="amount_total" required>
+
+    <label>Montant payé :</label>
+    <input type="number" id="amount_paid" value="0">
+
+    <label>Date limite :</label>
+    <input type="date" id="dueDate">
+
+    <label>Notes :</label>
+    <input type="text" id="notes">
+
+    <button type="submit">Créer</button>
+  </form>
+</section>
+
+<!-- ===== LIST ===== -->
+<section>
+  <h2>Liste des dettes</h2>
+
+  <table border="1" id="debtTable">
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Type</th>
+        <th>Total</th>
+        <th>Payé</th>
+        <th>Reste</th>
+        <th>Status</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<script type="module" src="js/debts.js"></script>
+
+</body>
+</html>
