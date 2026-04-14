@@ -1,4 +1,4 @@
-// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE
+// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE + debts logique 
 
 import { 
   db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs, query, where
@@ -10,6 +10,10 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 enableIndexedDbPersistence(db).catch(() => {});
 
 // --- DOM ---
+const paymentType = document.getElementById('paymentType');
+const amountPaidInput = document.getElementById('amountPaid');
+const clientNameInput = document.getElementById('clientName');
+
 const productsContainer = document.getElementById('productsContainer');
 const cartDom = document.querySelector('.cart');
 const cartTotalDom = cartDom.querySelector('.total');
@@ -17,6 +21,16 @@ const sellBtn = cartDom.querySelector('.sell-btn');
 const manualDateCheckbox = document.getElementById('manualDate');
 const saleDateInput = document.getElementById('saleDate');
 const searchInput = document.getElementById('searchInput');
+
+
+// ---- open debts input 
+paymentType.addEventListener('change', () => {
+  if (paymentType.value === "partial") {
+    amountPaidInput.style.display = "block";
+  } else {
+    amountPaidInput.style.display = "none";
+  }
+});
 
 // --- STATE ---
 let cart = [];
@@ -74,13 +88,13 @@ function renderProducts(list) {
 div.style.backgroundImage = `url(${img})`;
 div.style.backgroundSize = "cover";
 div.style.backgroundPosition = "center";
-    
+
     div.innerHTML = `
       <div class="product-content">
         <h4>${p.name}</h4>
         ${p.variant ? `<div>${p.variant}</div>` : ""}
         <p>Stock: ${p.stock_current ?? 0}</p>
-        <p>${(p.price_sell || 0).toFixed(2)}FC</p>
+        <p>${(p.price_sell || 0).toFixed(2)}$</p>
       </div>
     `;
 
@@ -152,11 +166,9 @@ function updateCartUI() {
     const controls = document.createElement('span');
 
     const input = document.createElement('input');
-input.type = "number";
-input.value = item.price;
-input.min = item.price_min;
-input.style.width = "50px";
-input.style.marginRight = "5px";
+    input.type = "number";
+    input.value = item.price;
+    input.min = item.price_min;
 
     const ok = document.createElement('button');
     ok.textContent = "OK";
@@ -183,7 +195,7 @@ input.style.marginRight = "5px";
     total += item.price * item.qty;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)}FC`;
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
 }
 
 // --- STOCK RECALC ---
@@ -237,13 +249,30 @@ sellBtn.addEventListener('click', async () => {
       : Timestamp.now();
 
     const totalAmount = cart.reduce((a,b)=>a+b.qty*b.price,0);
-    const totalProfit = cart.reduce((a,b)=>a+(b.price-b.price_buy)*b.qty,0);
+const totalProfit = cart.reduce((a,b)=>a+(b.price-b.price_buy)*b.qty,0);
+
+const paymentMode = paymentType.value;
+let amountPaid = totalAmount;
+
+if (paymentMode === "partial") {
+  amountPaid = parseFloat(amountPaidInput.value || 0);
+  if (paymentMode === "partial" && !clientNameInput.value.trim()) {
+  throw new Error("Nom client obligatoire pour dette");
+}
+
+  if (isNaN(amountPaid) || amountPaid < 0 || amountPaid > totalAmount) {
+    throw new Error("Montant payé invalide");
+  }
+}
 
     const saleRef = await addDoc(collection(db,"sales"), {
       sellerId: currentUserId,
       total_amount: totalAmount,
       total_profit: totalProfit,
       status: "active",
+payment_status: paymentMode === "full" ? "paid" : "partial",
+amount_paid: amountPaid,
+amount_remaining: totalAmount - amountPaid,
       createdAt: saleDate
     });
 
@@ -279,6 +308,29 @@ sellBtn.addEventListener('click', async () => {
 
       await recalcStock(item.productId);
     }
+    if (paymentMode === "partial") {
+
+  await addDoc(collection(db, "debts"), {
+    type: "client",
+    name: clientNameInput.value || "Client inconnu",
+    phone: "",
+    
+    amount_total: totalAmount,
+    amount_paid: amountPaid,
+    amount_remaining: totalAmount - amountPaid,
+
+    status: amountPaid === 0 ? "pending" : "partial",
+
+    dueDate: Timestamp.fromDate(new Date(Date.now() + 7*24*60*60*1000))
+    createdAt: Timestamp.now(),
+
+    relatedSaleId: saleRef.id,
+    notes: "",
+
+    createdBy: currentUserId
+  });
+
+}
 
     cart = [];
     updateCartUI();
@@ -287,6 +339,7 @@ sellBtn.addEventListener('click', async () => {
     if (window.generateReceipt) {
       window.generateReceipt({
         saleId: saleRef.id,
+        name: clientNameInput.value || "Client inconnu",
         items: soldItems,
         total: totalAmount,
         date: new Date()
