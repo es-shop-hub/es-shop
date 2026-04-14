@@ -150,34 +150,17 @@ nav div.active {
 }
 
 /* --- AUTH LINKS --- */
-  .debts-btn{
-  display: inline-block;
-  background: #0B5FFF;
-  color: #fff;
-  padding: 10px 16px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: bold;
-  transition: 0.2s;
-}
-
-.debts-btn:hover{
-  background: #0847c2;
-}
-.auth-links {
+  .auth-links {
   display: flex;
   gap: 10px;
   justify-content: center;
+  align-items: center;
   margin: 20px 0;
 }
-  
-  .auth-links{
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
 
-.auth-links .btn{
+/* Base bouton */
+.auth-links .btn,
+.debts-btn {
   padding: 10px 14px;
   border-radius: 8px;
   text-decoration: none;
@@ -185,29 +168,40 @@ nav div.active {
   font-size: 14px;
   transition: 0.2s ease;
   border: 1px solid transparent;
+  display: inline-block;
 }
 
-/* Bouton connexion */
-.auth-links .btn:first-child{
+/* Connexion */
+.auth-links .btn:first-child {
   background: transparent;
   color: #0B5FFF;
   border-color: #0B5FFF;
 }
 
-.auth-links .btn:first-child:hover{
+.auth-links .btn:first-child:hover {
   background: #0B5FFF;
   color: white;
 }
 
-/* Bouton inscription */
-.auth-links .btn:last-child{
+/* Inscription */
+.auth-links .btn:last-child {
   background: #0B5FFF;
   color: white;
 }
 
-.auth-links .btn:last-child:hover{
+.auth-links .btn:last-child:hover {
   background: #0847c2;
-  }
+}
+
+/* Dettes (style intermédiaire important) */
+.debts-btn {
+  background: #ffb020;
+  color: #1a1a1a;
+}
+
+.debts-btn:hover {
+  background: #e69a00;
+    }
 </style>
 </head>
 
@@ -217,10 +211,10 @@ nav div.active {
   <h3>ES Shop - Produits</h3>
   <div class="status">● Online</div>
 </header>
-<a href="debts.html" class="debts-btn">Dettes</a>
 <div class="auth-links">
   <a href="login.html" class="btn">Connexion</a>
   <a href="signup.html" class="btn">Inscription</a>
+  <a href="debts.html" class="debts-btn">Dettes</a>
 </div>
 
 <div class="container">
