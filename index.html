@@ -237,6 +237,16 @@
     <label for="manualDate">Modifier date vente</label>
     <input type="date" id="saleDate" disabled>
   </div>
+  <div class="payment-box">
+  <input type="text" id="clientName" placeholder="Nom client (optionnel)">
+  
+  <select id="paymentType">
+    <option value="full">Paiement total</option>
+    <option value="partial">Paiement partiel (dette)</option>
+  </select>
+
+  <input type="number" id="amountPaid" placeholder="Montant payé" style="display:none;">
+  </div>
 
   <div class="total">Total: 0FC</div>
 
