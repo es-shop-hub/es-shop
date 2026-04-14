@@ -251,14 +251,15 @@ sellBtn.addEventListener('click', async () => {
     const totalAmount = cart.reduce((a,b)=>a+b.qty*b.price,0);
 const totalProfit = cart.reduce((a,b)=>a+(b.price-b.price_buy)*b.qty,0);
 
-const paymentMode = paymentType.value;
+const paymentMode = paymentType ? paymentType.value : "full";
 let amountPaid = totalAmount;
 
 if (paymentMode === "partial") {
   amountPaid = parseFloat(amountPaidInput.value || 0);
-  if (paymentMode === "partial" && !clientNameInput.value.trim()) {
-  throw new Error("Nom client obligatoire pour dette");
-}
+
+  if (!clientNameInput.value.trim()) {
+    throw new Error("Nom client obligatoire pour dette");
+  }
 
   if (isNaN(amountPaid) || amountPaid < 0 || amountPaid > totalAmount) {
     throw new Error("Montant payé invalide");
@@ -321,7 +322,7 @@ amount_remaining: totalAmount - amountPaid,
 
     status: amountPaid === 0 ? "pending" : "partial",
 
-    dueDate: Timestamp.fromDate(new Date(Date.now() + 7*24*60*60*1000))
+    dueDate: Timestamp.fromDate(new Date(Date.now() + 7*24*60*60*1000)),
     createdAt: Timestamp.now(),
 
     relatedSaleId: saleRef.id,
