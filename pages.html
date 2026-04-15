@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ES Shop - Pages</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial;}
+
+body{
+  background:#0f0f0f;
+  color:white;
+}
+
+/* CONTAINER */
+.container{
+  padding:20px;
+}
+
+/* TITLE */
+h2{
+  margin-bottom:15px;
+}
+
+/* GRID */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+}
+
+/* CARD */
+.card{
+  background:#1c1c1c;
+  padding:15px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:0.2s;
+  text-align:center;
+}
+
+.card:hover{
+  background:#0B3D2E;
+}
+
+.card h4{
+  font-size:14px;
+  margin-bottom:5px;
+}
+
+.card p{
+  font-size:11px;
+  color:#aaa;
+}
+
+/* LOCKED */
+.locked{
+  background:#111;
+  opacity:0.3;
+  pointer-events:none;
+}
+
+/* BLOCK SCREEN */
+#blocked{
+  position:fixed;
+  inset:0;
+  background:black;
+  display:none;
+  justify-content:center;
+  align-items:center;
+  font-size:18px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="blocked">⛔ Accès refusé</div>
+
+<div class="container">
+
+<h2>📂 Navigation</h2>
+
+<div class="grid" id="pages-grid">
+
+  <!-- CORE -->
+  <div class="card" data-page="index.html">
+    <h4>🛒 Vente rapide</h4>
+    <p>Créer une vente</p>
+  </div>
+
+  <div class="card" data-page="products.html">
+    <h4>📦 Produits</h4>
+    <p>Gestion du stock</p>
+  </div>
+
+  <div class="card" data-page="stats.html">
+    <h4>📊 Statistiques</h4>
+    <p>Analyse business</p>
+  </div>
+
+  <div class="card" data-page="purchases.html">
+    <h4>📥 Achats</h4>
+    <p>Entrées stock</p>
+  </div>
+
+  <div class="card" data-page="losses.html">
+    <h4>❌ Pertes</h4>
+    <p>Produits perdus</p>
+  </div>
+
+  <!-- FINANCE -->
+  <div class="card" data-page="debts.html">
+    <h4>💳 Dettes</h4>
+    <p>Clients & fournisseurs</p>
+  </div>
+
+  <div class="card" data-page="expenses.html">
+    <h4>💸 Dépenses</h4>
+    <p>Sorties argent</p>
+  </div>
+
+  <!-- SYSTEM -->
+  <div class="card" data-page="settings.html">
+    <h4>⚙️ Paramètres</h4>
+    <p>Configuration</p>
+  </div>
+
+  <!-- AUTH -->
+  <div class="card" data-page="login.html">
+    <h4>🔐 Login</h4>
+    <p>Connexion</p>
+  </div>
+
+  <div class="card" data-page="signup.html">
+    <h4>📝 Signup</h4>
+    <p>Créer compte</p>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+/* NAVIGATION */
+document.querySelectorAll(".card").forEach(el=>{
+  el.onclick = () => {
+    location.href = el.dataset.page;
+  };
+});
+</script>
+<script type="module" src="js/pages.js"></script>
+</body>
+</html>
