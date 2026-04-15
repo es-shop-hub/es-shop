@@ -1,16 +1,23 @@
-// --- CONFIG ---
-const SHOP_NAME = "Es-Shop";
-const SHOP_ADDRESS = "Adresse : Butembo-Rughenda";
+import { jsPDF } from "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+
+/* ================================
+   CONFIG
+================================ */
+const SHOP_NAME = "ES-SHOP";
+const SHOP_ADDRESS = "Adresse : Rughenda-Kaleverio";
 const SHOP_PHONE = "Tel : +243840344307";
-const logoUrl = "https://example.com/logo.png";
+const logoUrl = "/logo.png";
 
 const MAX_ITEMS_PER_RECEIPT = 18;
 
-// --- LOAD LOGO ---
+/* ================================
+   LOAD LOGO
+================================ */
 async function loadImage(url) {
   return new Promise((res, rej) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
+
     img.onload = () => {
       const canvas = document.createElement("canvas");
       canvas.width = img.width;
@@ -18,12 +25,15 @@ async function loadImage(url) {
       canvas.getContext("2d").drawImage(img, 0, 0);
       res(canvas.toDataURL("image/png"));
     };
-    img.onerror = rej;
+
+    img.onerror = () => res(null); // ⚠️ ne casse jamais le PDF
     img.src = url;
   });
 }
 
-// --- FORMAT DATE ---
+/* ================================
+   FORMAT DATE
+================================ */
 function formatDate(date) {
   const d = new Date(date);
   return d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", {
@@ -32,7 +42,20 @@ function formatDate(date) {
   });
 }
 
-// --- DRAW ONE RECEIPT ---
+/* ================================
+   NORMALIZE DATA (ANTI BUG)
+================================ */
+function normalizeItems(items = []) {
+  return items.map(i => ({
+    name: i.name || "Produit",
+    qty: Number(i.qty ?? i.quantity ?? 0),
+    price: Number(i.price ?? 0)
+  }));
+}
+
+/* ================================
+   DRAW RECEIPT
+================================ */
 function drawReceipt(doc, data, x, y, width, height, logo) {
   let cursorY = y + 20;
 
@@ -40,15 +63,17 @@ function drawReceipt(doc, data, x, y, width, height, logo) {
   doc.setLineWidth(0.5);
   doc.rect(x, y, width, height);
 
-  // Logo + Name
+  // Logo
   if (logo) doc.addImage(logo, "PNG", x + 10, cursorY, 40, 20);
 
+  // Shop name
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.text(SHOP_NAME, x + width / 2, cursorY + 10, { align: "center" });
 
   cursorY += 30;
 
+  // Infos boutique
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(SHOP_ADDRESS, x + width / 2, cursorY, { align: "center" });
@@ -60,15 +85,25 @@ function drawReceipt(doc, data, x, y, width, height, logo) {
   doc.line(x + 10, cursorY, x + width - 10, cursorY);
   cursorY += 12;
 
-  // Receipt info
-  doc.text(`Reçu #: ${data.saleId}`, x + 10, cursorY);
-  doc.text(`Date: ${formatDate(data.date)}`, x + width - 10, cursorY, { align: "right" });
+  /* ================================
+     CLIENT + META (POSITION CORRECTE)
+  ================================= */
+  doc.setFontSize(10);
+
+  doc.text(`Client: ${data.name || "Client inconnu"}`, x + 10, cursorY);
+  doc.text(`Reçu #: ${data.saleId}`, x + width - 10, cursorY, { align: "right" });
+
+  cursorY += 12;
+
+  doc.text(`Date: ${formatDate(data.date)}`, x + 10, cursorY);
 
   cursorY += 10;
   doc.line(x + 10, cursorY, x + width - 10, cursorY);
   cursorY += 12;
 
-  // Table Header
+  /* ================================
+     TABLE HEADER
+  ================================= */
   doc.setFont("helvetica", "bold");
   doc.text("Produit", x + 10, cursorY);
   doc.text("Qté", x + width - 110, cursorY, { align: "right" });
@@ -78,7 +113,9 @@ function drawReceipt(doc, data, x, y, width, height, logo) {
   cursorY += 10;
   doc.setFont("helvetica", "normal");
 
-  // Items
+  /* ================================
+     ITEMS
+  ================================= */
   data.items.forEach(item => {
     const total = item.qty * item.price;
 
@@ -95,7 +132,9 @@ function drawReceipt(doc, data, x, y, width, height, logo) {
 
   cursorY += 12;
 
-  // Total
+  /* ================================
+     TOTAL
+  ================================= */
   doc.setFont("helvetica", "bold");
   doc.text(`TOTAL: ${data.total.toFixed(2)}$`, x + width - 10, cursorY, { align: "right" });
 
@@ -111,8 +150,24 @@ function drawReceipt(doc, data, x, y, width, height, logo) {
   doc.line(x + 10, cursorY, x + 120, cursorY);
 }
 
-// --- MAIN FUNCTION ---
-window.generateReceipt = async function(data) {
+/* ================================
+   MAIN EXPORT FUNCTION (MODULE)
+================================ */
+export async function generateReceipt(rawData) {
+
+  if (!rawData || !rawData.items) {
+    console.error("Invalid receipt data");
+    return;
+  }
+
+  const items = normalizeItems(rawData.items);
+
+  const data = {
+    ...rawData,
+    items,
+    total: Number(rawData.total ?? items.reduce((a, b) => a + b.qty * b.price, 0))
+  };
+
   const doc = new jsPDF({ unit: "pt", format: "a4" });
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -121,18 +176,19 @@ window.generateReceipt = async function(data) {
   const receiptWidth = pageWidth - 40;
   const receiptHeight = (pageHeight - 60) / 2;
 
-  let logo = null;
-  try {
-    logo = await loadImage(logoUrl);
-  } catch {}
+  const logo = await loadImage(logoUrl);
 
-  // --- SPLIT ITEMS ---
+  /* ================================
+     SPLIT ITEMS
+  ================================= */
   const chunks = [];
   for (let i = 0; i < data.items.length; i += MAX_ITEMS_PER_RECEIPT) {
     chunks.push(data.items.slice(i, i + MAX_ITEMS_PER_RECEIPT));
   }
 
-  // --- GENERATE ---
+  /* ================================
+     GENERATION
+  ================================= */
   chunks.forEach((itemsChunk, index) => {
 
     if (index !== 0 && index % 2 === 0) doc.addPage();
@@ -142,15 +198,21 @@ window.generateReceipt = async function(data) {
     const receiptData = {
       ...data,
       items: itemsChunk,
-      total: itemsChunk.reduce((a,b)=>a + b.qty * b.price, 0)
+      total: itemsChunk.reduce((a, b) => a + b.qty * b.price, 0)
     };
 
-    // double receipt (copie client + boutique)
+    // copie client + boutique
     drawReceipt(doc, receiptData, 20, yOffset, receiptWidth, receiptHeight, logo);
     drawReceipt(doc, receiptData, 20, yOffset, receiptWidth, receiptHeight, logo);
   });
 
+  /* ================================
+     OUTPUT
+  ================================= */
   doc.save(`recu_${data.saleId}.pdf`);
-  doc.autoPrint();
-window.open(doc.output('bloburl'), '_blank');
-};
+
+  try {
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
+  } catch {}
+}
