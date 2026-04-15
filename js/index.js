@@ -5,6 +5,8 @@ import {
 } from './firebase.js';
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { generateReceipt } from "./receipt.js";
+
 
 // --- OFFLINE ---
 enableIndexedDbPersistence(db).catch(() => {});
@@ -337,15 +339,13 @@ amount_remaining: totalAmount - amountPaid,
     updateCartUI();
     await loadProducts();
 
-    if (window.generateReceipt) {
-      window.generateReceipt({
-        saleId: saleRef.id,
-        name: clientNameInput.value || "Client inconnu",
-        items: soldItems,
-        total: totalAmount,
-        date: new Date()
-      });
-    }
+await generateReceipt({
+  saleId: saleRef.id,
+  name: clientNameInput.value || "Client inconnu",
+  items: soldItems,
+  total: totalAmount,
+  date: new Date()
+});
 
     alert("Vente OK");
 
