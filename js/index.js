@@ -94,7 +94,7 @@ div.style.backgroundPosition = "center";
         <h4>${p.name}</h4>
         ${p.variant ? `<div>${p.variant}</div>` : ""}
         <p>Stock: ${p.stock_current ?? 0}</p>
-        <p>${(p.price_sell || 0).toFixed(2)}$</p>
+        <p>${(p.price_sell || 0).toFixed(2)}FC</p>
       </div>
     `;
 
@@ -195,7 +195,7 @@ function updateCartUI() {
     total += item.price * item.qty;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)}FC`;
 }
 
 // --- STOCK RECALC ---
