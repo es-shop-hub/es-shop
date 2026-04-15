@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ES Shop - Statistiques</title>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif;}
+
+body {
+  background:#F5F5F5;
+  color:#111;
+  padding-bottom:70px;
+}
+
+/* HEADER */
+header {
+  background:#0B3D2E;
+  color:white;
+  padding:12px 15px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+/* CONTAINER */
+.container { padding:20px; }
+
+/* SECTION */
+.stats-section {
+  background:white;
+  border-radius:12px;
+  padding:20px;
+  margin-bottom:20px;
+  box-shadow:0 3px 8px rgba(0,0,0,0.08);
+}
+
+.stats-section h4 {
+  margin-bottom:12px;
+  color:#0B3D2E;
+}
+
+/* KPI */
+.kpi {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.kpi div {
+  flex:1;
+  background:#0B3D2E;
+  color:white;
+  padding:12px;
+  border-radius:10px;
+  text-align:center;
+  font-size:13px;
+  font-weight:bold;
+}
+
+/* TOTALS */
+.totals {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.totals div {
+  background:#0B3D2E;
+  color:white;
+  padding:10px;
+  border-radius:10px;
+  flex:1;
+  text-align:center;
+  font-size:12px;
+}
+
+/* FILTER */
+.filter-bar select {
+  padding:6px;
+  border-radius:6px;
+}
+
+/* EXPORT */
+.export-buttons {
+  margin-top:10px;
+}
+.export-buttons button {
+  margin-right:6px;
+  padding:6px 12px;
+  border:none;
+  background:#D4AF37;
+  color:#111;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+}
+
+/* GRAPH */
+canvas {
+  width:100%;
+  height:300px;
+  margin-top:15px;
+}
+
+/* NAV */
+nav {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: #111;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0;
+  color: white;
+}
+
+nav div {
+  font-size:12px;
+  cursor:pointer;
+}
+
+nav .active {
+  color:#D4AF37;
+  font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h3>📊 Statistiques</h3>
+  <div>● Online</div>
+</header>
+
+<div class="container">
+
+  <!-- 🔥 KPI -->
+  <div class="stats-section">
+    <h4>⚡ Performance Aujourd’hui</h4>
+    <div class="kpi">
+      <div id="kpi-sales">Ventes: 0 FC</div>
+      <div id="kpi-profit">Profit: 0 FC</div>
+      <div id="kpi-count">Ventes: 0</div>
+      <div id="kpi-products">Articles: 0</div>
+    </div>
+  </div>
+
+  <!-- 🔥 COMPARAISON -->
+  <div class="stats-section">
+    <h4>📊 Comparaison</h4>
+    <div class="totals" id="comparison-box"></div>
+  </div>
+
+  <!-- 🔥 TEMPS RÉEL -->
+  <div class="stats-section">
+    <h4>📄 7 derniers jours</h4>
+    <div class="totals" id="daily-totals"></div>
+    <div class="export-buttons">
+      <button id="export-week">Exporter PDF</button>
+    </div>
+  </div>
+
+  <div class="stats-section">
+    <h4>📅 5 dernières semaines</h4>
+    <div class="totals" id="weekly-totals"></div>
+    <div class="export-buttons">
+      <button id="export-month">Exporter PDF</button>
+    </div>
+  </div>
+
+  <!-- 🔥 FILTRE ANNÉE -->
+  <div class="stats-section">
+    <h4>📆 Analyse annuelle</h4>
+    <div class="filter-bar">
+      <select id="yearSelect"></select>
+    </div>
+
+    <div class="totals" id="monthly-totals"></div>
+    <div class="totals" id="yearly-total"></div>
+
+    <div class="export-buttons">
+      <button id="export-year">Exporter PDF</button>
+    </div>
+  </div>
+
+  <!-- 🔥 GRAPHS -->
+  <div class="stats-section">
+    <h4>📈 Hebdomadaire (Évolution)</h4>
+    <canvas id="weekly-chart"></canvas>
+  </div>
+
+  <div class="stats-section">
+    <h4>📊 Mensuel</h4>
+    <canvas id="monthly-chart"></canvas>
+  </div>
+
+  <div class="stats-section">
+    <h4>📉 Annuel (Vente + Profit)</h4>
+    <canvas id="yearly-chart"></canvas>
+  </div>
+
+</div>
+
+<!-- NAV -->
+<nav>
+  <div data-page="index.html">🛒 Accueil</div>
+  <div data-page="products.html">📦 Produits</div>
+  <div class="active" data-page="stats.html">📊 Stats</div>
+  <div data-page="settings.html">⚙️ Paramètres</div>
+  <div data-page="purchases.html">📥 Achats</div>
+  <div data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<!-- LIB -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- NAV SCRIPT -->
+<script>
+document.querySelectorAll('nav div').forEach(el=>{
+  el.onclick = ()=> location.href = el.dataset.page;
+});
+</script>
+
+<!-- 🔥 INIT PRO -->
+<script type="module">
+import { initStatsApp } from './js/ui.js';
+initStatsApp();
+</script>
+
+</body>
+</html>
