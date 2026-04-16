@@ -14,7 +14,7 @@ import jsPDF from "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/+esm";
 /* ================================
    🧠 CONFIG
 ================================ */
-const logoUrl = "https://dummyimage.com/100x40/0B3D2E/ffffff&text=ES+SHOP";
+const logoUrl = "/logo.png";
 
 /* ================================
    🧾 FORMATTERS
