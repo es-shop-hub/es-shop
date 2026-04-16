@@ -1,6 +1,3 @@
-window.onerror = function(msg, url, line) {
-  alert("Erreur: " + msg + " ligne: " + line);
-};
 import {
   fetchAllData,
   getTodayStats,
@@ -207,4 +204,17 @@ async function initDashboard() {
 /* ================================
    🚀 BOOT
 ================================ */
-initDashboard();
+
+
+export async function initStatsApp() {
+  try {
+    console.log("UI LOADED");
+    await initDashboard();
+  } catch (e) {
+    alert("Erreur UI: " + e.message);
+    console.error(e);
+  }
+}
+
+// AUTO START
+initStatsApp();
