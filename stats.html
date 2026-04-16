@@ -214,9 +214,6 @@ nav .active {
   <div data-page="losses.html">❌ Pertes</div>
 </nav>
 
-<!-- LIB -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <!-- NAV SCRIPT -->
 <script>
 document.querySelectorAll('nav div').forEach(el=>{
@@ -225,10 +222,7 @@ document.querySelectorAll('nav div').forEach(el=>{
 </script>
 
 <!-- 🔥 INIT PRO -->
-<script type="module">
-import { initStatsApp } from './js/ui.js';
-initStatsApp();
-</script>
-
+<script type="module" src="js/ui.js"></script>
+  <script type="module" src="js/downs.js"></script>
 </body>
 </html>
