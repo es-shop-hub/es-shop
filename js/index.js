@@ -338,14 +338,14 @@ amount_remaining: totalAmount - amountPaid,
     cart = [];
     updateCartUI();
     await loadProducts();
-if (generateReceipt) {
+ if (generateReceipt) {
   await generateReceipt({
   saleId: saleRef.id,
   name: clientNameInput.value || "Client inconnu",
   items: soldItems,
   total: totalAmount,
   date: new Date()
-});
+}); }
 
     alert("Vente OK");
 
