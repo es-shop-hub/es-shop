@@ -5,8 +5,8 @@ import {
 } from './firebase.js';
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { generateReceipt } from "./receipt.js";
 
+import { generateReceipt } from "./receipt.js";
 
 // --- OFFLINE ---
 enableIndexedDbPersistence(db).catch(() => {});
@@ -96,7 +96,7 @@ div.style.backgroundPosition = "center";
         <h4>${p.name}</h4>
         ${p.variant ? `<div>${p.variant}</div>` : ""}
         <p>Stock: ${p.stock_current ?? 0}</p>
-        <p>${(p.price_sell || 0).toFixed(2)}FC</p>
+        <p>${(p.price_sell || 0).toFixed(2)}$</p>
       </div>
     `;
 
@@ -197,7 +197,7 @@ function updateCartUI() {
     total += item.price * item.qty;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)}FC`;
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
 }
 
 // --- STOCK RECALC ---
@@ -338,6 +338,7 @@ amount_remaining: totalAmount - amountPaid,
     cart = [];
     updateCartUI();
     await loadProducts();
+
 
 await generateReceipt({
   saleId: saleRef.id,
