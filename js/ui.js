@@ -1,3 +1,6 @@
+window.onerror = function(msg, url, line) {
+  alert("Erreur: " + msg + " ligne: " + line);
+};
 import {
   fetchAllData,
   getTodayStats,
