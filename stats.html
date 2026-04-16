@@ -3,226 +3,223 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ES Shop - Statistiques</title>
+<title>Stats Pro</title>
 
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif;}
-
-body {
-  background:#F5F5F5;
-  color:#111;
-  padding-bottom:70px;
+:root {
+  --bg:#0f172a;
+  --card:#1e293b;
+  --text:#e2e8f0;
+  --muted:#94a3b8;
+  --green:#22c55e;
+  --red:#ef4444;
 }
 
-/* HEADER */
-header {
-  background:#0B3D2E;
-  color:white;
-  padding:12px 15px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
+body{
+  margin:0;
+  font-family:system-ui;
+  background:var(--bg);
+  color:var(--text);
 }
 
-/* CONTAINER */
-.container { padding:20px; }
-
-/* SECTION */
-.stats-section {
-  background:white;
-  border-radius:12px;
+header{
   padding:20px;
-  margin-bottom:20px;
-  box-shadow:0 3px 8px rgba(0,0,0,0.08);
+  font-size:18px;
+  border-bottom:1px solid #334155;
 }
 
-.stats-section h4 {
-  margin-bottom:12px;
-  color:#0B3D2E;
+section{
+  padding:20px;
 }
 
-/* KPI */
-.kpi {
-  display:flex;
+h2{
+  margin:0 0 10px;
+  color:var(--muted);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
   gap:10px;
-  flex-wrap:wrap;
 }
 
-.kpi div {
-  flex:1;
-  background:#0B3D2E;
-  color:white;
+.card{
+  background:var(--card);
   padding:12px;
   border-radius:10px;
-  text-align:center;
-  font-size:13px;
+}
+
+.value{
+  font-size:18px;
   font-weight:bold;
+  margin-top:5px;
 }
 
-/* TOTALS */
-.totals {
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-}
-
-.totals div {
-  background:#0B3D2E;
-  color:white;
-  padding:10px;
-  border-radius:10px;
-  flex:1;
-  text-align:center;
-  font-size:12px;
-}
-
-/* FILTER */
-.filter-bar select {
-  padding:6px;
-  border-radius:6px;
-}
-
-/* EXPORT */
-.export-buttons {
-  margin-top:10px;
-}
-.export-buttons button {
-  margin-right:6px;
-  padding:6px 12px;
-  border:none;
-  background:#D4AF37;
-  color:#111;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:12px;
-}
-
-/* GRAPH */
-canvas {
-  width:100%;
-  height:300px;
-  margin-top:15px;
-}
-
-/* NAV */
-nav {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  background: #111;
-  display: flex;
-  justify-content: space-around;
-  padding: 10px 0;
-  color: white;
-}
-
-nav div {
-  font-size:12px;
-  cursor:pointer;
-}
-
-nav .active {
-  color:#D4AF37;
-  font-weight:bold;
-}
+.green{color:var(--green);}
+.red{color:var(--red);}
 </style>
 </head>
 
 <body>
 
-<header>
-  <h3>📊 Statistiques</h3>
-  <div>● Online</div>
-</header>
+<header>📊 Stats Business (Live Firebase)</header>
 
-<div class="container">
+<div id="app"></div>
 
-  <!-- 🔥 KPI -->
-  <div class="stats-section">
-    <h4>⚡ Performance Aujourd’hui</h4>
-    <div class="kpi">
-      <div id="kpi-sales">Ventes: 0 FC</div>
-      <div id="kpi-profit">Profit: 0 FC</div>
-      <div id="kpi-count">Ventes: 0</div>
-      <div id="kpi-products">Articles: 0</div>
+<script type="module">
+
+import { db, collection, getDocs } from "js/firebase.js";
+
+/* ================================
+   HELPERS
+================================ */
+const now = new Date();
+
+const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const startOfWeek = d => {
+  const date = new Date(d);
+  const day = date.getDay() || 7;
+  if (day !== 1) date.setDate(date.getDate() - (day - 1));
+  return startOfDay(date);
+};
+const startOfMonth = d => new Date(d.getFullYear(), d.getMonth(), 1);
+const startOfYear = d => new Date(d.getFullYear(), 0, 1);
+
+const toDate = t => t?.toDate ? t.toDate() : new Date(t);
+
+function money(v){ return (v||0).toFixed(2)+" FC"; }
+
+/* ================================
+   FETCH FIREBASE
+================================ */
+async function getAll(col){
+  const snap = await getDocs(collection(db,col));
+  return snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+async function fetchData(){
+  const [sales, sale_items, expenses, debts] = await Promise.all([
+    getAll("sales"),
+    getAll("sale_items"),
+    getAll("expenses"),
+    getAll("debts")
+  ]);
+
+  return { sales, sale_items, expenses, debts };
+}
+
+/* ================================
+   FILTER
+================================ */
+function filter(data,start,end){
+  return data.filter(d=>{
+    const date = toDate(d.createdAt);
+    return date >= start && date <= end;
+  });
+}
+
+/* ================================
+   CALCUL
+================================ */
+function compute({sales, sale_items, expenses, debts}){
+
+  const total_sales = sales.reduce((a,s)=>a+(s.total_amount||0),0);
+  const total_profit = sales.reduce((a,s)=>a+(s.total_profit||0),0);
+  const total_expenses = expenses.reduce((a,e)=>a+(e.amount||0),0);
+  const debts_remaining = debts.reduce((a,d)=>a+(d.amount_remaining||0),0);
+
+  const nb_sales = sales.length;
+  const products_sold = sale_items.reduce((a,i)=>a+(i.quantity||0),0);
+
+  return {
+    total_sales,
+    total_profit,
+    total_expenses,
+    debts_remaining,
+    real_cash: total_sales - debts_remaining,
+    net: total_profit - total_expenses,
+    nb_sales,
+    products_sold,
+    panier: nb_sales ? total_sales/nb_sales : 0
+  };
+}
+
+/* ================================
+   UI
+================================ */
+function card(t,v,c=""){
+  return `
+    <div class="card">
+      <div>${t}</div>
+      <div class="value ${c}">${v}</div>
     </div>
-  </div>
+  `;
+}
 
-  <!-- 🔥 COMPARAISON -->
-  <div class="stats-section">
-    <h4>📊 Comparaison</h4>
-    <div class="totals" id="comparison-box"></div>
-  </div>
+function renderBlock(title,stats){
+  return `
+    <section>
+      <h2>${title}</h2>
+      <div class="grid">
+        ${card("Ventes", money(stats.total_sales))}
+        ${card("Profit", money(stats.total_profit),"green")}
+        ${card("Dépenses", money(stats.total_expenses),"red")}
+        ${card("Dettes", money(stats.debts_remaining),"red")}
+        ${card("Cash réel", money(stats.real_cash))}
+        ${card("Net", money(stats.net), stats.net>=0?"green":"red")}
+        ${card("Nb ventes", stats.nb_sales)}
+        ${card("Produits", stats.products_sold)}
+        ${card("Panier", money(stats.panier))}
+      </div>
+    </section>
+  `;
+}
 
-  <!-- 🔥 TEMPS RÉEL -->
-  <div class="stats-section">
-    <h4>📄 7 derniers jours</h4>
-    <div class="totals" id="daily-totals"></div>
-    <div class="export-buttons">
-      <button id="export-week">Exporter PDF</button>
-    </div>
-  </div>
+/* ================================
+   INIT
+================================ */
+async function init(){
 
-  <div class="stats-section">
-    <h4>📅 5 dernières semaines</h4>
-    <div class="totals" id="weekly-totals"></div>
-    <div class="export-buttons">
-      <button id="export-month">Exporter PDF</button>
-    </div>
-  </div>
+  const data = await fetchData();
 
-  <!-- 🔥 FILTRE ANNÉE -->
-  <div class="stats-section">
-    <h4>📆 Analyse annuelle</h4>
-    <div class="filter-bar">
-      <select id="yearSelect"></select>
-    </div>
+  const today = compute({
+    sales: filter(data.sales,startOfDay(now),now),
+    sale_items: filter(data.sale_items,startOfDay(now),now),
+    expenses: filter(data.expenses,startOfDay(now),now),
+    debts: filter(data.debts,startOfDay(now),now)
+  });
 
-    <div class="totals" id="monthly-totals"></div>
-    <div class="totals" id="yearly-total"></div>
+  const week = compute({
+    sales: filter(data.sales,startOfWeek(now),now),
+    sale_items: filter(data.sale_items,startOfWeek(now),now),
+    expenses: filter(data.expenses,startOfWeek(now),now),
+    debts: filter(data.debts,startOfWeek(now),now)
+  });
 
-    <div class="export-buttons">
-      <button id="export-year">Exporter PDF</button>
-    </div>
-  </div>
+  const month = compute({
+    sales: filter(data.sales,startOfMonth(now),now),
+    sale_items: filter(data.sale_items,startOfMonth(now),now),
+    expenses: filter(data.expenses,startOfMonth(now),now),
+    debts: filter(data.debts,startOfMonth(now),now)
+  });
 
-  <!-- 🔥 GRAPHS -->
-  <div class="stats-section">
-    <h4>📈 Hebdomadaire (Évolution)</h4>
-    <canvas id="weekly-chart"></canvas>
-  </div>
+  const year = compute({
+    sales: filter(data.sales,startOfYear(now),now),
+    sale_items: filter(data.sale_items,startOfYear(now),now),
+    expenses: filter(data.expenses,startOfYear(now),now),
+    debts: filter(data.debts,startOfYear(now),now)
+  });
 
-  <div class="stats-section">
-    <h4>📊 Mensuel</h4>
-    <canvas id="monthly-chart"></canvas>
-  </div>
+  document.getElementById("app").innerHTML =
+    renderBlock("Aujourd’hui",today) +
+    renderBlock("Semaine",week) +
+    renderBlock("Mois",month) +
+    renderBlock("Année",year);
+}
 
-  <div class="stats-section">
-    <h4>📉 Annuel (Vente + Profit)</h4>
-    <canvas id="yearly-chart"></canvas>
-  </div>
+init();
 
-</div>
-
-<!-- NAV -->
-<nav>
-  <div data-page="index.html">🛒 Accueil</div>
-  <div data-page="products.html">📦 Produits</div>
-  <div class="active" data-page="stats.html">📊 Stats</div>
-  <div data-page="settings.html">⚙️ Paramètres</div>
-  <div data-page="purchases.html">📥 Achats</div>
-  <div data-page="losses.html">❌ Pertes</div>
-</nav>
-
-<!-- NAV SCRIPT -->
-<script>
-document.querySelectorAll('nav div').forEach(el=>{
-  el.onclick = ()=> location.href = el.dataset.page;
-});
 </script>
 
-<!-- 🔥 INIT PRO -->
-<script type="module" src="js/ui.js"></script>
-  <script type="module" src="js/downs.js"></script>
 </body>
-</html>
+  </html>
