@@ -1,5 +1,4 @@
-import { jsPDF } from "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-
+import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 /* ================================
    CONFIG
 ================================ */
@@ -211,8 +210,4 @@ export async function generateReceipt(rawData) {
   ================================= */
   doc.save(`recu_${data.saleId}.pdf`);
 
-  try {
-    doc.autoPrint();
-    window.open(doc.output('bloburl'), '_blank');
-  } catch {}
 }
