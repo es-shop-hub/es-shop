@@ -1,12 +1,10 @@
-// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE + debts logique (retouche)
+// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE + debts logique sans reçu 
 
 import { 
   db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs, query, where
 } from './firebase.js';
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-//import { generateReceipt } from "./receipt.js";
-
 
 // --- OFFLINE ---
 enableIndexedDbPersistence(db).catch(() => {});
@@ -96,7 +94,7 @@ div.style.backgroundPosition = "center";
         <h4>${p.name}</h4>
         ${p.variant ? `<div>${p.variant}</div>` : ""}
         <p>Stock: ${p.stock_current ?? 0}</p>
-        <p>${(p.price_sell || 0).toFixed(2)}FC</p>
+        <p>${(p.price_sell || 0).toFixed(2)}$</p>
       </div>
     `;
 
@@ -197,7 +195,7 @@ function updateCartUI() {
     total += item.price * item.qty;
   });
 
-  cartTotalDom.textContent = `Total: ${total.toFixed(2)}FC`;
+  cartTotalDom.textContent = `Total: ${total.toFixed(2)}$`;
 }
 
 // --- STOCK RECALC ---
@@ -338,14 +336,16 @@ amount_remaining: totalAmount - amountPaid,
     cart = [];
     updateCartUI();
     await loadProducts();
-/* if (generateReceipt) {
-  await generateReceipt({
-  saleId: saleRef.id,
-  name: clientNameInput.value || "Client inconnu",
-  items: soldItems,
-  total: totalAmount,
-  date: new Date()
-}); } */
+
+    if (window.generateReceipt) {
+      window.generateReceipt({
+        saleId: saleRef.id,
+        name: clientNameInput.value || "Client inconnu",
+        items: soldItems,
+        total: totalAmount,
+        date: new Date()
+      });
+    }
 
     alert("Vente OK");
 
@@ -358,8 +358,6 @@ amount_remaining: totalAmount - amountPaid,
     sellBtn.disabled = false;
   }
 });
-}
-
 
 // --- INIT ---
 onAuthStateChanged(auth, async (user) => {
