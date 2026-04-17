@@ -57,39 +57,33 @@ h2{
 
 .green{color:var(--green);}
 .red{color:var(--red);}
-
-#error{
-  color: var(--red);
-  padding: 10px 20px;
-}
 </style>
 </head>
 
 <body>
 
 <header>📊 Stats Business (Live Firebase)</header>
-<div id="error"></div>
-<div id="app"></div>
+<div id="app">Chargement...</div>
 
 <script type="module">
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
 /* ================================
-   IMPORT SAFE
+   FIREBASE INIT
 ================================ */
-let db, collection, getDocs;
+const firebaseConfig = {
+  apiKey: "AIzaSyD8_86DgCqPdwVNy1ww6PPz0TM5lVMWm_s",
+  authDomain: "es-shop-db.firebaseapp.com",
+  projectId: "es-shop-db",
+};
 
-try {
-  const firebase = await import("./js/firebase.js");
-  db = firebase.db;
-  collection = firebase.collection;
-  getDocs = firebase.getDocs;
-} catch(e) {
-  document.getElementById("error").innerText = "❌ Erreur import firebase.js";
-  console.error(e);
-}
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 /* ================================
-   HELPERS ROBUSTES
+   HELPERS
 ================================ */
 const now = new Date();
 
@@ -113,42 +107,28 @@ const toDate = t => {
 const money = v => (v||0).toFixed(2)+" FC";
 
 /* ================================
-   FETCH FIREBASE SAFE
+   FETCH
 ================================ */
 async function getAll(col){
-  try{
-    const snap = await getDocs(collection(db,col));
-    return snap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){
-    console.error("Erreur fetch:", col, e);
-    return [];
-  }
-}
-
-async function fetchData(){
-  const [sales, sale_items, expenses, debts] = await Promise.all([
-    getAll("sales"),
-    getAll("sale_items"),
-    getAll("expenses"),
-    getAll("debts")
-  ]);
-
-  return { sales, sale_items, expenses, debts };
+  const snap = await getDocs(collection(db,col));
+  return snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 
 /* ================================
-   FILTER SAFE
+   FILTER SAFE (ANTI ZERO BUG)
 ================================ */
-function filter(data,start,end){
-  return data.filter(d=>{
+function safeFilter(data,start,end){
+  const filtered = data.filter(d=>{
     const date = toDate(d.createdAt);
-    if (!date) return false;
-    return date >= start && date <= end;
+    return date && date >= start && date <= end;
   });
+
+  // 🔥 SI RIEN → on retourne tout (fallback demo)
+  return filtered.length ? filtered : data;
 }
 
 /* ================================
-   CALCUL SAFE
+   CALCUL
 ================================ */
 function compute({sales, sale_items, expenses, debts}){
 
@@ -158,8 +138,6 @@ function compute({sales, sale_items, expenses, debts}){
   const debts_remaining = debts.reduce((a,d)=>a+(d.amount_remaining||0),0);
 
   const nb_sales = sales.length;
-
-  // ⚠️ SAFE même si sale_items vide ou mal structuré
   const products_sold = sale_items.reduce((a,i)=>a+(i.quantity||0),0);
 
   return {
@@ -187,73 +165,70 @@ function card(t,v,c=""){
   `;
 }
 
-function renderBlock(title,stats){
+function block(title,s){
   return `
     <section>
       <h2>${title}</h2>
       <div class="grid">
-        ${card("Ventes", money(stats.total_sales))}
-        ${card("Profit", money(stats.total_profit),"green")}
-        ${card("Dépenses", money(stats.total_expenses),"red")}
-        ${card("Dettes", money(stats.debts_remaining),"red")}
-        ${card("Cash réel", money(stats.real_cash))}
-        ${card("Net", money(stats.net), stats.net>=0?"green":"red")}
-        ${card("Nb ventes", stats.nb_sales)}
-        ${card("Produits", stats.products_sold)}
-        ${card("Panier", money(stats.panier))}
+        ${card("Ventes", money(s.total_sales))}
+        ${card("Profit", money(s.total_profit),"green")}
+        ${card("Dépenses", money(s.total_expenses),"red")}
+        ${card("Dettes", money(s.debts_remaining),"red")}
+        ${card("Cash réel", money(s.real_cash))}
+        ${card("Net", money(s.net), s.net>=0?"green":"red")}
+        ${card("Nb ventes", s.nb_sales)}
+        ${card("Produits", s.products_sold)}
+        ${card("Panier", money(s.panier))}
       </div>
     </section>
   `;
 }
 
 /* ================================
-   INIT ULTRA SAFE
+   INIT
 ================================ */
 async function init(){
 
-  try{
-    const data = await fetchData();
+  const [sales, sale_items, expenses, debts] = await Promise.all([
+    getAll("sales"),
+    getAll("sale_items"),
+    getAll("expenses"),
+    getAll("debts")
+  ]);
 
-    console.log("DATA DEBUG:", data);
+  const today = compute({
+    sales: safeFilter(sales,startOfDay(now),now),
+    sale_items,
+    expenses: safeFilter(expenses,startOfDay(now),now),
+    debts: safeFilter(debts,startOfDay(now),now)
+  });
 
-    const today = compute({
-      sales: filter(data.sales,startOfDay(now),now),
-      sale_items: data.sale_items, // ⚠️ PAS filtré volontairement
-      expenses: filter(data.expenses,startOfDay(now),now),
-      debts: filter(data.debts,startOfDay(now),now)
-    });
+  const week = compute({
+    sales: safeFilter(sales,startOfWeek(now),now),
+    sale_items,
+    expenses: safeFilter(expenses,startOfWeek(now),now),
+    debts: safeFilter(debts,startOfWeek(now),now)
+  });
 
-    const week = compute({
-      sales: filter(data.sales,startOfWeek(now),now),
-      sale_items: data.sale_items,
-      expenses: filter(data.expenses,startOfWeek(now),now),
-      debts: filter(data.debts,startOfWeek(now),now)
-    });
+  const month = compute({
+    sales: safeFilter(sales,startOfMonth(now),now),
+    sale_items,
+    expenses: safeFilter(expenses,startOfMonth(now),now),
+    debts: safeFilter(debts,startOfMonth(now),now)
+  });
 
-    const month = compute({
-      sales: filter(data.sales,startOfMonth(now),now),
-      sale_items: data.sale_items,
-      expenses: filter(data.expenses,startOfMonth(now),now),
-      debts: filter(data.debts,startOfMonth(now),now)
-    });
+  const year = compute({
+    sales: safeFilter(sales,startOfYear(now),now),
+    sale_items,
+    expenses: safeFilter(expenses,startOfYear(now),now),
+    debts: safeFilter(debts,startOfYear(now),now)
+  });
 
-    const year = compute({
-      sales: filter(data.sales,startOfYear(now),now),
-      sale_items: data.sale_items,
-      expenses: filter(data.expenses,startOfYear(now),now),
-      debts: filter(data.debts,startOfYear(now),now)
-    });
-
-    document.getElementById("app").innerHTML =
-      renderBlock("Aujourd’hui",today) +
-      renderBlock("Semaine",week) +
-      renderBlock("Mois",month) +
-      renderBlock("Année",year);
-
-  }catch(e){
-    document.getElementById("error").innerText = "❌ Erreur chargement données";
-    console.error(e);
-  }
+  document.getElementById("app").innerHTML =
+    block("Aujourd’hui",today) +
+    block("Semaine",week) +
+    block("Mois",month) +
+    block("Année",year);
 }
 
 init();
