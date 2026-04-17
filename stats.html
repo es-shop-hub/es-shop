@@ -189,47 +189,63 @@ function block(title,s){
 ================================ */
 async function init(){
 
-  const [sales, sale_items, expenses, debts] = await Promise.all([
-    getAll("sales"),
-    getAll("sale_items"),
-    getAll("expenses"),
-    getAll("debts")
-  ]);
+  try {
 
-  const today = compute({
-    sales: safeFilter(sales,startOfDay(now),now),
-    sale_items,
-    expenses: safeFilter(expenses,startOfDay(now),now),
-    debts: safeFilter(debts,startOfDay(now),now)
-  });
+    const [sales, sale_items, expenses, debts] = await Promise.all([
+      getAll("sales"),
+      getAll("sale_items"),
+      getAll("expenses"),
+      getAll("debts")
+    ]);
 
-  const week = compute({
-    sales: safeFilter(sales,startOfWeek(now),now),
-    sale_items,
-    expenses: safeFilter(expenses,startOfWeek(now),now),
-    debts: safeFilter(debts,startOfWeek(now),now)
-  });
+    console.log("DATA:", { sales, sale_items, expenses, debts });
 
-  const month = compute({
-    sales: safeFilter(sales,startOfMonth(now),now),
-    sale_items,
-    expenses: safeFilter(expenses,startOfMonth(now),now),
-    debts: safeFilter(debts,startOfMonth(now),now)
-  });
+    const today = compute({
+      sales: safeFilter(sales,startOfDay(now),now),
+      sale_items,
+      expenses: safeFilter(expenses,startOfDay(now),now),
+      debts: safeFilter(debts,startOfDay(now),now)
+    });
 
-  const year = compute({
-    sales: safeFilter(sales,startOfYear(now),now),
-    sale_items,
-    expenses: safeFilter(expenses,startOfYear(now),now),
-    debts: safeFilter(debts,startOfYear(now),now)
-  });
+    const week = compute({
+      sales: safeFilter(sales,startOfWeek(now),now),
+      sale_items,
+      expenses: safeFilter(expenses,startOfWeek(now),now),
+      debts: safeFilter(debts,startOfWeek(now),now)
+    });
 
-  document.getElementById("app").innerHTML =
-    block("Aujourd’hui",today) +
-    block("Semaine",week) +
-    block("Mois",month) +
-    block("Année",year);
-}
+    const month = compute({
+      sales: safeFilter(sales,startOfMonth(now),now),
+      sale_items,
+      expenses: safeFilter(expenses,startOfMonth(now),now),
+      debts: safeFilter(debts,startOfMonth(now),now)
+    });
+
+    const year = compute({
+      sales: safeFilter(sales,startOfYear(now),now),
+      sale_items,
+      expenses: safeFilter(expenses,startOfYear(now),now),
+      debts: safeFilter(debts,startOfYear(now),now)
+    });
+
+    document.getElementById("app").innerHTML =
+      block("Aujourd’hui",today) +
+      block("Semaine",week) +
+      block("Mois",month) +
+      block("Année",year);
+
+  } catch(e) {
+
+    console.error("ERREUR INIT:", e);
+
+    document.getElementById("app").innerHTML = `
+      <div style="color:red;padding:20px;">
+        ❌ Erreur chargement données<br>
+        ${e.message}
+      </div>
+    `;
+  }
+  }
 
 init();
 
