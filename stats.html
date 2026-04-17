@@ -89,8 +89,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-/* ================= AUTH FLOW CLEAN ================= */
-signInAnonymously(auth).catch(console.error);
+/* ================= AUTH ================= */
+await signInAnonymously(auth);
 
 /* ================= HELPERS ================= */
 const now = new Date();
@@ -105,26 +105,26 @@ const startOfWeek = d => {
 const startOfMonth = d => new Date(d.getFullYear(), d.getMonth(), 1);
 const startOfYear = d => new Date(d.getFullYear(), 0, 1);
 
-function toDate(t){
+const toDate = t => {
   if (!t) return null;
   if (t?.toDate) return t.toDate();
   if (t?.seconds) return new Date(t.seconds * 1000);
   const d = new Date(t);
   return isNaN(d) ? null : d;
-}
+};
 
 const money = v => (v || 0).toFixed(2) + " FC";
 
 /* ================= FIRESTORE ================= */
 async function getAll(col){
-  const snap = await getDocs(collection(db, col));
+  const snap = await getDocs(collection(db,col));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-function filter(data, start, end){
-  return data.filter(d => {
+function filter(data,start,end){
+  return data.filter(d=>{
     const date = toDate(d.createdAt);
-    if (!date) return true;
+    if(!date) return true;
     return date >= start && date <= end;
   });
 }
@@ -178,12 +178,12 @@ function block(title,s){
   `;
 }
 
-/* ================= MAIN ================= */
+/* ================= MAIN (IMPORTANT) ================= */
 onAuthStateChanged(auth, async (user) => {
 
-  if (!user) {
+  if(!user){
     document.getElementById("app").innerHTML =
-      `<div style="color:red;padding:20px;">❌ Auth failed</div>`;
+      "❌ Auth failed";
     return;
   }
 
@@ -226,7 +226,6 @@ onAuthStateChanged(auth, async (user) => {
     block("Mois",month) +
     block("Année",year);
 });
-  </script>
-
+</script>
 <</body>
 </html>
