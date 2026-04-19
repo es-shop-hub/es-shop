@@ -1,15 +1,20 @@
-// OK index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE (sans debt system)
-
+// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE + debts logique (retouche 2)
 import { 
   db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs, query, where
 } from './firebase.js';
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { generateReceipt } from "./receipt.js";
+
 
 // --- OFFLINE ---
 enableIndexedDbPersistence(db).catch(() => {});
 
 // --- DOM ---
+const paymentType = document.getElementById('paymentType');
+const amountPaidInput = document.getElementById('amountPaid');
+const clientNameInput = document.getElementById('clientName');
+
 const productsContainer = document.getElementById('productsContainer');
 const cartDom = document.querySelector('.cart');
 const cartTotalDom = cartDom.querySelector('.total');
@@ -17,6 +22,18 @@ const sellBtn = cartDom.querySelector('.sell-btn');
 const manualDateCheckbox = document.getElementById('manualDate');
 const saleDateInput = document.getElementById('saleDate');
 const searchInput = document.getElementById('searchInput');
+
+
+// ---- open debts input 
+paymentType.addEventListener('change', () => {
+  const isPartial = paymentType.value === "partial";
+
+  amountPaidInput.style.display = isPartial ? "block" : "none";
+
+  if (!isPartial) {
+    amountPaidInput.value = "";
+  }
+});
 
 // --- STATE ---
 let cart = [];
@@ -74,7 +91,7 @@ function renderProducts(list) {
 div.style.backgroundImage = `url(${img})`;
 div.style.backgroundSize = "cover";
 div.style.backgroundPosition = "center";
-    
+
     div.innerHTML = `
       <div class="product-content">
         <h4>${p.name}</h4>
@@ -152,11 +169,9 @@ function updateCartUI() {
     const controls = document.createElement('span');
 
     const input = document.createElement('input');
-input.type = "number";
-input.value = item.price;
-input.min = item.price_min;
-input.style.width = "50px";
-input.style.marginRight = "5px";
+    input.type = "number";
+    input.value = item.price;
+    input.min = item.price_min;
 
     const ok = document.createElement('button');
     ok.textContent = "OK";
@@ -207,6 +222,37 @@ async function recalcStock(productId) {
   return total;
 }
 
+// calculator pour dettes 
+function computePayment(totalAmount, paymentMode, inputAmount) {
+
+  let amount_paid = totalAmount;
+
+  if (paymentMode === "partial") {
+
+    if (inputAmount === "" || inputAmount === null || inputAmount === undefined) {
+      throw new Error("Montant requis");
+    }
+
+    const val = Number(inputAmount);
+
+    if (isNaN(val)) throw new Error("Montant invalide");
+    if (val <= 0 || val >= totalAmount) {
+      throw new Error("Montant partiel incorrect");
+    }
+
+    amount_paid = val;
+  }
+
+  const amount_remaining = totalAmount - amount_paid;
+
+  return {
+    payment_status: amount_remaining === 0 ? "paid" : "partial",
+    amount_paid,
+    amount_remaining,
+    hasDebt: amount_remaining > 0
+  };
+}
+
 // --- SELL (ANTI DOUBLE) ---
 sellBtn.addEventListener('click', async () => {
 
@@ -231,21 +277,34 @@ sellBtn.addEventListener('click', async () => {
         throw new Error(`Prix < minimum (${item.name})`);
       }
     }
+    
+    if (manualDateCheckbox.checked && !saleDateInput.value) {
+  throw new Error("Date requise");
+}
 
     const saleDate = manualDateCheckbox.checked && saleDateInput.value
       ? Timestamp.fromDate(new Date(saleDateInput.value))
       : Timestamp.now();
 
     const totalAmount = cart.reduce((a,b)=>a+b.qty*b.price,0);
-    const totalProfit = cart.reduce((a,b)=>a+(b.price-b.price_buy)*b.qty,0);
+const totalProfit = cart.reduce((a,b)=>a+(b.price-b.price_buy)*b.qty,0);
 
-    const saleRef = await addDoc(collection(db,"sales"), {
-      sellerId: currentUserId,
-      total_amount: totalAmount,
-      total_profit: totalProfit,
-      status: "active",
-      createdAt: saleDate
-    });
+const paymentMode = paymentType ? paymentType.value : "full";
+
+    const payment = computePayment(
+  totalAmount,
+  paymentType.value,
+  amountPaidInput.value
+);
+
+const saleRef = await addDoc(collection(db,"sales"), {
+  sellerId: currentUserId,
+  total_amount: totalAmount,
+  total_profit: totalProfit,
+  status: "active",
+  ...payment,
+  createdAt: saleDate
+});
 
     const soldItems = [...cart];
 
@@ -279,21 +338,51 @@ sellBtn.addEventListener('click', async () => {
 
       await recalcStock(item.productId);
     }
+    if (paymentMode === "partial") {
+
+  await addDoc(collection(db, "debts"), {
+    type: "client",
+    name: clientNameInput.value || "Client inconnu",
+    phone: "",
+    
+    amount_paid: payment.amount_paid,
+    amount_remaining: payment.amount_remaining,
+    status: payment.hasDebt ? "partial" : "paid",
+    amount_total: totalAmount,
+
+    dueDate: Timestamp.fromDate(new Date(Date.now() + 7*24*60*60*1000)),
+    createdAt: Timestamp.now(),
+
+    relatedSaleId: saleRef.id,
+    notes: "",
+
+    createdBy: currentUserId
+  });
+
+}
 
     cart = [];
     updateCartUI();
     await loadProducts();
-
-    if (window.generateReceipt) {
-      window.generateReceipt({
-        saleId: saleRef.id,
-        items: soldItems,
-        total: totalAmount,
-        date: new Date()
-      });
-    }
-
+    
+try {
+  await generateReceipt({
+  saleId: saleRef.id,
+  name: clientNameInput.value || "Client inconnu",
+  items: soldItems,
+  total: totalAmount,
+  amountPaid: payment.amount_paid,
+  remaining: payment.amount_remaining,
+  paymentMode: payment.payment_status,
+  date: new Date()
+});
+} catch (err) {
+  console.warn("Receipt failed:", err);
+}
     alert("Vente OK");
+    resetPaymentUI();
+paymentType.value = "full";
+clientNameInput.value = "";
 
   } catch (e) {
     console.error(e);
@@ -302,8 +391,8 @@ sellBtn.addEventListener('click', async () => {
     // 🔒 UNLOCK (CRITIQUE)
     isProcessingSale = false;
     sellBtn.disabled = false;
-  }
-});
+}
+
 
 // --- INIT ---
 onAuthStateChanged(auth, async (user) => {
@@ -312,9 +401,13 @@ onAuthStateChanged(auth, async (user) => {
   currentUserId = user.uid;
 
   try {
-    await checkUser(currentUserId);
-    loadProducts();
-  } catch (e) {
-    alert(e.message);
-  }
+      await checkUser(currentUserId);
+      await loadProducts();
+  } catch(e){
+  alert(e.message);
+    }
 });
+function resetPaymentUI() {
+  amountPaidInput.value = "";
+  amountPaidInput.style.display = "none";
+}
