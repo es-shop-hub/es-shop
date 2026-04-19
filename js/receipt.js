@@ -56,69 +56,73 @@ function normalizeItems(items = []) {
    DRAW RECEIPT
 ================================ */
 function drawReceipt(doc, data, x, y, width, height, logo) {
+
   let cursorY = y + 20;
 
-  // Border
+  // ================================
+  // BORDER
+  // ================================
   doc.setLineWidth(0.5);
   doc.rect(x, y, width, height);
 
-  // Logo
-  if (logo) doc.addImage(logo, "PNG", x + 10, cursorY, 40, 20);
+  // ================================
+  // HEADER (LOGO + SHOP)
+  // ================================
+  if (logo) {
+    doc.addImage(logo, "PNG", x + 10, cursorY, 40, 20);
+  }
 
-  // Shop name
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(SHOP_NAME, x + width / 2, cursorY + 10, { align: "center" });
+  doc.text(SHOP_NAME, x + 60, cursorY + 10);
 
-  cursorY += 30;
-
-  // Infos boutique
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(SHOP_ADDRESS, x + width / 2, cursorY, { align: "center" });
-  cursorY += 12;
-  doc.text(SHOP_PHONE, x + width / 2, cursorY, { align: "center" });
+  doc.text(SHOP_ADDRESS, x + 60, cursorY + 22);
+  doc.text(SHOP_PHONE, x + 60, cursorY + 32);
 
-  cursorY += 15;
+  cursorY += 45;
 
   doc.line(x + 10, cursorY, x + width - 10, cursorY);
   cursorY += 12;
 
-  /* ================================
-     CLIENT + META (POSITION CORRECTE)
-  ================================= */
+  // ================================
+  // CLIENT + META
+  // ================================
   doc.setFontSize(10);
 
-  doc.text(`Client: ${data.name || "Client inconnu"}`, x + 10, cursorY);
+  doc.text(`Client : ${data.name || "Client inconnu"}`, x + 10, cursorY);
   doc.text(`Reçu #: ${data.saleId}`, x + width - 10, cursorY, { align: "right" });
 
   cursorY += 12;
 
-  doc.text(`Date: ${formatDate(data.date)}`, x + 10, cursorY);
+  doc.text(`Date   : ${formatDate(data.date)}`, x + 10, cursorY);
 
   cursorY += 10;
   doc.line(x + 10, cursorY, x + width - 10, cursorY);
   cursorY += 12;
 
-  /* ================================
-     TABLE HEADER
-  ================================= */
+  // ================================
+  // TABLE HEADER
+  // ================================
   doc.setFont("helvetica", "bold");
+
   doc.text("Produit", x + 10, cursorY);
   doc.text("Qté", x + width - 110, cursorY, { align: "right" });
   doc.text("Prix", x + width - 70, cursorY, { align: "right" });
   doc.text("Total", x + width - 10, cursorY, { align: "right" });
 
   cursorY += 10;
+
   doc.setFont("helvetica", "normal");
 
-  /* ================================
-     ITEMS
-  ================================= */
+  // ================================
+  // ITEMS
+  // ================================
   data.items.forEach(item => {
     const total = item.qty * item.price;
 
-    doc.text(item.name.substring(0, 18), x + 10, cursorY);
+    doc.text(String(item.name).substring(0, 20), x + 10, cursorY);
     doc.text(String(item.qty), x + width - 110, cursorY, { align: "right" });
     doc.text(item.price.toFixed(2), x + width - 70, cursorY, { align: "right" });
     doc.text(total.toFixed(2), x + width - 10, cursorY, { align: "right" });
@@ -129,24 +133,59 @@ function drawReceipt(doc, data, x, y, width, height, logo) {
   cursorY += 5;
   doc.line(x + 10, cursorY, x + width - 10, cursorY);
 
-  cursorY += 12;
+  // ================================
+  // TOTAL (GROS + CENTRÉ VISUEL)
+  // ================================
+  cursorY += 15;
 
-  /* ================================
-     TOTAL
-  ================================= */
   doc.setFont("helvetica", "bold");
-  doc.text(`TOTAL: ${data.total.toFixed(2)}$`, x + width - 10, cursorY, { align: "right" });
+  doc.setFontSize(12);
+  doc.text(`TOTAL : ${data.total.toFixed(2)} FC`, x + width - 10, cursorY, { align: "right" });
 
-  cursorY += 20;
+  cursorY += 10;
+  doc.setLineWidth(1);
+  doc.line(x + 10, cursorY, x + width - 10, cursorY);
+
+  cursorY += 15;
+
+  // ================================
+  // PAYMENT BLOCK
+  // ================================
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("──────── Paiement ────────", x + 10, cursorY);
+
+  cursorY += 12;
+  doc.setFont("helvetica", "normal");
+
+  const paid = Number(data.amountPaid || data.total);
+  const remaining = Number(data.remaining || 0);
+  const status = data.paymentMode === "partial" ? "PAIEMENT PARTIEL" : "PAYÉ";
+
+  doc.text(`Payé   : ${paid.toFixed(2)} FC`, x + 10, cursorY);
+  cursorY += 10;
+
+  doc.text(`Reste  : ${remaining.toFixed(2)} FC`, x + 10, cursorY);
+  cursorY += 10;
+
+  doc.text(`Statut : ${status}`, x + 10, cursorY);
+
+  cursorY += 15;
+  doc.line(x + 10, cursorY, x + width - 10, cursorY);
+
+  // ================================
+  // FOOTER
+  // ================================
+  cursorY += 15;
 
   doc.setFont("helvetica", "normal");
-  doc.text("Merci pour votre achat", x + width / 2, cursorY, { align: "center" });
+  doc.text("Merci pour votre achat 🙏", x + width / 2, cursorY, { align: "center" });
 
   cursorY += 20;
 
   doc.text("Signature vendeur :", x + 10, cursorY);
   cursorY += 10;
-  doc.line(x + 10, cursorY, x + 120, cursorY);
+  doc.line(x + 10, cursorY, x + 150, cursorY);
 }
 
 /* ================================
