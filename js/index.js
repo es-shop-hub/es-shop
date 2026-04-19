@@ -398,7 +398,7 @@ clientNameInput.value = "";
     isProcessingSale = false;
     sellBtn.disabled = false;
 }
-
+});
 
 // --- INIT ---
 onAuthStateChanged(auth, async (user) => {
