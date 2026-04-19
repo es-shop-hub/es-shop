@@ -25,7 +25,7 @@ const searchInput = document.getElementById('searchInput');
 
 
 // ---- open debts input 
-paymentType.addEventListener('change', () => {
+function togglePaymentInput() {
   const isPartial = paymentType.value === "partial";
 
   amountPaidInput.style.display = isPartial ? "block" : "none";
@@ -33,7 +33,13 @@ paymentType.addEventListener('change', () => {
   if (!isPartial) {
     amountPaidInput.value = "";
   }
-});
+}
+
+// event
+paymentType.addEventListener('change', togglePaymentInput);
+
+// 🔥 IMPORTANT : sync initial state au chargement
+togglePaymentInput();
 
 // --- STATE ---
 let cart = [];
