@@ -181,6 +181,7 @@ function updateCartUI() {
 
     const input = document.createElement('input');
     input.type = "number";
+    input.style.width = "30px";
     input.value = item.price;
     input.min = item.price_min;
 
