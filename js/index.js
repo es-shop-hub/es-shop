@@ -26,7 +26,7 @@ const searchInput = document.getElementById('searchInput');
 
 // ---- open debts input 
 function togglePaymentInput() {
-  const isPartial = paymentType.value === "partial";
+  const isPartial = paymentType?.value === "partial";
 
   amountPaidInput.style.display = isPartial ? "block" : "none";
 
@@ -34,9 +34,14 @@ function togglePaymentInput() {
     amountPaidInput.value = "";
   }
 }
+// INIT event
+document.addEventListener("DOMContentLoaded", () => {
+  togglePaymentInput();
+});
 
-// event
+// EVENTS
 paymentType.addEventListener('change', togglePaymentInput);
+
 
 // 🔥 IMPORTANT : sync initial state au chargement
 togglePaymentInput();
@@ -295,14 +300,14 @@ sellBtn.addEventListener('click', async () => {
     const totalAmount = cart.reduce((a,b)=>a+b.qty*b.price,0);
 const totalProfit = cart.reduce((a,b)=>a+(b.price-b.price_buy)*b.qty,0);
 
-const paymentMode = paymentType ? paymentType.value : "full";
+const paymentMode = paymentType.value;
 
-    const payment = computePayment(
+const payment = computePayment(
   totalAmount,
-  paymentType.value,
+  paymentMode,
   amountPaidInput.value
 );
-
+    
 const saleRef = await addDoc(collection(db,"sales"), {
   sellerId: currentUserId,
   total_amount: totalAmount,
