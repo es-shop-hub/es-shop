@@ -1,4 +1,4 @@
-// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE + debts logique (retouche 2)
+// index.js FINAL ULTRA PRO + ANTI DOUBLE VENTE + debts logique (retouche 4 - pro) OK
 import { 
   db, collection, addDoc, getDoc, doc, updateDoc, Timestamp, enableIndexedDbPersistence, getDocs, query, where
 } from './firebase.js';
@@ -181,7 +181,7 @@ function updateCartUI() {
 
     const input = document.createElement('input');
     input.type = "number";
-    input.style.width = "50px";
+    input.style.width = "70px";
     input.value = item.price;
     input.min = item.price_min;
 
