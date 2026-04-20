@@ -38,8 +38,8 @@ const stockMovementsCol = collection(db, 'stock_movements');
 const logsCol = collection(db, 'logs');
 
 //----- recherche et filtre------
-stockSearch.addEventListener('input', applyFilters);
-stockFilter.addEventListener('change', applyFilters);
+if (stockSearch) stockSearch.addEventListener('input', applyFilters);
+if (stockFilter) stockFilter.addEventListener('change', applyFilters);
 
 function applyFilters() {
   let list = [...allProducts];
@@ -134,7 +134,7 @@ if (selectedProductId === "new") {
         imageUrl: imageUrl || "",
         category: "default",
         price_buy: unitPrice,
-        price_sell: unitPrice * DEFAULT_MARGIN // marge par défaut
+        price_sell: unitPrice * DEFAULT_MARGIN, // marge par défaut
         stock_current: 0,
         stock_alert: STOCK_ALERT_THRESHOLD,
         isActive: true,
