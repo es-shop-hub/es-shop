@@ -1,4 +1,4 @@
-// purchases.js - VERSION FINALE PRO
+// purchases.js - VERSION FINALE PRO  (+ filtre côté client bon à <300 produits)
 import { 
   db, collection, addDoc, getDocs, doc, updateDoc, query, where, serverTimestamp, getDoc 
 } from './firebase.js';
@@ -16,12 +16,50 @@ const productNameInput = document.getElementById('productName');
 const variantInput = document.getElementById('variant');
 const imageUrlInput = document.getElementById('imageUrl');
 
+const stockSearch = document.getElementById('stockSearch');
+const stockFilter = document.getElementById('stockFilter');
+
+let allProducts = [];
+
+const DEFAULT_MARGIN = 1.3;
+
+const toggleBtn = document.querySelector('.commande button');
+
+toggleBtn.addEventListener('click', () => {
+  const f = purchaseForm;
+  f.style.display = (f.style.display === "none") ? "flex" : "none";
+});
+
 // --- COLLECTIONS ---
 const purchasesCol = collection(db, 'purchases');
 const purchaseItemsCol = collection(db, 'purchase_items');
 const productsCol = collection(db, 'products');
 const stockMovementsCol = collection(db, 'stock_movements');
 const logsCol = collection(db, 'logs');
+
+//----- recherche et filtre------
+stockSearch.addEventListener('input', applyFilters);
+stockFilter.addEventListener('change', applyFilters);
+
+function applyFilters() {
+  let list = [...allProducts];
+
+  const searchValue = stockSearch.value.toLowerCase();
+  const filterValue = stockFilter.value;
+
+  if (searchValue) {
+    list = list.filter(p =>
+      p.name.toLowerCase().includes(searchValue) ||
+      (p.variant || "").toLowerCase().includes(searchValue)
+    );
+  }
+
+  if (filterValue === "low") {
+    list = list.filter(p => p.stock_current <= 10);
+  }
+
+  renderStock(list);
+}
 
 // --- CONFIG ---
 const STOCK_ALERT_THRESHOLD = 10;
@@ -39,16 +77,25 @@ async function checkUser(uid) {
   return data;
 }
 
+
 // --- AJOUT ACHAT ---
 purchaseForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!currentUserId) return alert("Utilisateur non connecté");
 
   const supplier = document.getElementById('supplierName').value.trim();
-  const selectedProduct = productSelect.value;
-  const productName = selectedProduct === "new"
-    ? productNameInput.value.trim()
-    : selectedProduct;
+  
+  const selectedProductId = productSelect.value;
+
+let productName;
+
+if (selectedProductId === "new") {
+  productName = productNameInput.value.trim();
+} else {
+  const selectedProductData = allProducts.find(p => p.id === selectedProductId);
+  productName = selectedProductData?.name || "";
+}
+
   const variant = variantInput.value.trim();
   const imageUrl = imageUrlInput.value.trim();
   const quantity = parseInt(document.getElementById('quantity').value);
@@ -87,7 +134,7 @@ purchaseForm.addEventListener('submit', async e => {
         imageUrl: imageUrl || "",
         category: "default",
         price_buy: unitPrice,
-        price_sell: unitPrice * 1.3, // marge par défaut
+        price_sell: unitPrice * DEFAULT_MARGIN // marge par défaut
         stock_current: 0,
         stock_alert: STOCK_ALERT_THRESHOLD,
         isActive: true,
@@ -118,6 +165,15 @@ purchaseForm.addEventListener('submit', async e => {
 
     // --- RECALCUL STOCK ---
     await recalcStock(productId);
+    
+    //--- EXPENSES
+    await addDoc(collection(db, "expenses"), {
+      type: "purchase",
+      amount: quantity * unitPrice,
+      relatedPurchaseId: purchaseRef.id,
+      createdAt: now,
+      createdBy: currentUserId
+});
 
     // --- LOG ---
     await addDoc(logsCol, {
@@ -157,18 +213,44 @@ async function recalcStock(productId) {
 async function loadStock() {
   stockTableBody.innerHTML = '';
   const prodSnap = await getDocs(productsCol);
+
+  allProducts = [];
+  
+  productSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+
   prodSnap.forEach(docSnap => {
     const p = docSnap.data();
     if (!p.isActive) return;
 
+    allProducts.push({
+      id: docSnap.id,
+      ...p
+    });
+    // AJOUT DIRECT AU SELECT
+const opt = document.createElement('option');
+opt.value = docSnap.id;
+opt.textContent = `${p.name} ${p.variant ? "(" + p.variant + ")" : ""}`;
+productSelect.appendChild(opt);
+  });
+
+  renderStock(allProducts);
+}
+
+// --------- render ----------
+function renderStock(list) {
+  stockTableBody.innerHTML = '';
+
+  list.forEach(p => {
     const tr = document.createElement('tr');
+
     tr.innerHTML = `
       <td>${p.name} ${p.variant ? "(" + p.variant + ")" : ""}</td>
       <td>${p.stock_current}</td>
       <td>${p.price_buy.toFixed(2)} FC</td>
       <td>${(p.stock_current * p.price_buy).toFixed(2)} FC</td>
-      <td><button onclick="manualUpdate('${docSnap.id}')">Modifier</button></td>
+      <td><button onclick="manualUpdate('${p.id}')">Modifier</button></td>
     `;
+
     stockTableBody.appendChild(tr);
   });
 }
