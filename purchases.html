@@ -38,6 +38,22 @@
       text-align: center;
       margin-top: 20px;
     }
+.commande {
+  width: 95%;
+  margin: 15px auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.commande button {
+  padding: 8px 12px;
+  background: #0B3D2E;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
 
     form {
       max-width: 500px;
@@ -82,6 +98,32 @@
       background: #192a56;
       color: white;
     }
+    .search-box {
+  width: 95%;
+  margin: 10px auto;
+}
+
+.search-box input {
+  width: 90%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.filtre {
+  width: 95%;
+  margin: 10px auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+#stockFilter {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  width: 150px;
+}
+
   </style>
 </head>
 <body>
@@ -95,9 +137,11 @@
   <div class="nav-item" data-page="losses.html">❌ Pertes</div>
 </nav>
 
+<div class="commande">
 <h2>Ajouter une commande fournisseur</h2>
-
-<form id="purchaseForm">
+<button onclick="toggleForm()">➕ Ajouter achat</button>
+</div>
+<form id="purchaseForm" style="display:none;">
 
   <label>Fournisseur :</label>
   <input type="text" id="supplierName" required>
@@ -122,6 +166,16 @@
   <button type="submit">Ajouter commande</button>
 </form>
 
+<div class="filtre">
+<select id="stockFilter">
+  <option value="all">Tous</option>
+  <option value="low">Stock faible</option>
+</select>
+</div>
+<div class="search-box">
+  <input type="text" id="stockSearch" placeholder="Rechercher produit...">
+</div>
+
 <h2>Stock actuel</h2>
 
 <table id="stockTable">
@@ -137,53 +191,14 @@
   <tbody></tbody>
 </table>
 
-<script type="module">
-import { db, collection, getDocs } from './firebase.js';
-
-const productSelect = document.getElementById('productSelect');
-const productNameInput = document.getElementById('productName');
-
-// --- SWITCH ---
-productSelect.addEventListener('change', () => {
-  if (productSelect.value === "new") {
-    productNameInput.style.display = "block";
-    productNameInput.value = "";
-  } else {
-    productNameInput.style.display = "none";
-    productNameInput.value = productSelect.value;
-  }
-});
-
-// --- LOAD PRODUITS ---
-async function loadProductOptions() {
-  const snap = await getDocs(collection(db, 'products'));
-
-  snap.forEach(docSnap => {
-    const p = docSnap.data();
-    if (!p.isActive) return;
-
-    const opt = document.createElement('option');
-    opt.value = p.name;
-    opt.textContent = `${p.name} ${p.variant ? "(" + p.variant + ")" : ""}`;
-    productSelect.appendChild(opt);
-  });
-
-  const newOpt = document.createElement('option');
-  newOpt.value = "new";
-  newOpt.textContent = "➕ Nouveau produit";
-  productSelect.appendChild(newOpt);
-}
-
-loadProductOptions();
-</script>
-
 <script type="module" src="js/purchases.js"></script>
 
 <script>
 document.querySelectorAll('nav .nav-item').forEach(item => {
   item.addEventListener('click', () => location.href = item.dataset.page);
 });
+
 </script>
 
 </body>
-</html>
+  </html>
