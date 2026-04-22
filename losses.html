@@ -42,27 +42,49 @@
   <h1>Signalement Pertes / Erreurs</h1>
 </header>
 <main>
-  <!-- Formulaire déclaration perte -->
-  <section id="declareLossSection">
-    <h2>Déclarer un produit disparu / perdu</h2>
-    <form id="lossForm">
-      <label for="productName">Produit :</label>
-      <input type="text" id="productName" required>
+  <!-- Formulaires de déclaration perte -->
+  <section id="lossProductSection">
+  <h2>📦 Déclarer une perte de produit</h2>
 
-      <label for="quantityLost">Quantité perdue :</label>
-      <input type="number" id="quantityLost" min="1" required>
+  <form id="lossProductForm">
 
-      <label for="reason">Raison :</label>
-      <select id="reason" required>
-        <option value="perte">Perte</option>
-        <option value="erreur_stock">Erreur de stock</option>
-        <option value="casse">Casse / endommagé</option>
-        <option value="autre">Autre</option>
-      </select>
+    <label>Produit :</label>
+    <select id="productSelect" required></select>
 
-      <button type="submit">Déclarer perte</button>
-    </form>
-  </section>
+    <label>Quantité perdue :</label>
+    <input type="number" id="productQuantityLost" min="1" required>
+
+    <label>Raison :</label>
+    <select id="productLossReason" required>
+      <option value="perte">Perte / vol</option>
+      <option value="casse">Casse / endommagé</option>
+      <option value="erreur_stock">Erreur de stock</option>
+      <option value="autre">Autre</option>
+    </select>
+
+    <button type="submit">Déclarer perte produit</button>
+  </form>
+</section>
+
+<section id="lossMoneySection">
+  <h2>💰 Déclarer une perte d'argent</h2>
+
+  <form id="lossMoneyForm">
+
+    <label>Montant perdu :</label>
+    <input type="number" id="moneyLostAmount" min="1" required>
+
+    <label>Raison :</label>
+    <select id="moneyLossReason" required>
+      <option value="vol">Vol d'argent</option>
+      <option value="faux_billet">Faux billet</option>
+      <option value="erreur_caisse">Erreur de caisse</option>
+      <option value="autre">Autre</option>
+    </select>
+
+    <button type="submit">Déclarer perte argent</button>
+  </form>
+</section>
 
   <!-- Historique pertes -->
   <section id="lossHistorySection">
