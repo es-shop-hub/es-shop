@@ -1,5 +1,6 @@
-// losses.js version finale (correction 3)
+// losses.js version finale (correction 5)
 import { db, collection, addDoc, doc, updateDoc, deleteDoc, getDocs, getDoc, serverTimestamp } from './firebase.js';
+import { query, where } from "firebase/firestore";
 
 const lossProductForm = document.getElementById('lossProductForm');
 const lossMoneyForm = document.getElementById('lossMoneyForm');
@@ -17,105 +18,119 @@ const productSelect = document.getElementById("productSelect");
 lossProductForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const productId = productSelect.value;
-  const quantityLost = parseInt(document.getElementById('productQuantityLost').value);
-  const reason = document.getElementById('productLossReason').value;
+  try {
 
-  if (!productId || quantityLost <= 0) return alert("Valeurs invalides");
+    const productId = productSelect.value;
+    const quantityLost = parseInt(document.getElementById('productQuantityLost').value);
+    const reason = document.getElementById('productLossReason').value;
 
-  const now = serverTimestamp();
-  const userId = "CURRENT_USER_ID"; // remplace par ton auth
+    if (!productId || quantityLost <= 0) {
+      alert("Valeurs invalides");
+      return;
+    }
 
-  const productRef = doc(db, "products", productId);
-  const productSnap = await getDoc(productRef);
+    const now = serverTimestamp();
+    const userId = "CURRENT_USER_ID";
 
-  if (!productSnap.exists()) return alert("Produit introuvable");
+    const productRef = doc(db, "products", productId);
+    const productSnap = await getDoc(productRef);
 
-  const product = productSnap.data();
+    if (!productSnap.exists()) {
+      alert("Produit introuvable");
+      return;
+    }
 
-  if (quantityLost > product.stock_current) {
-    return alert("Stock insuffisant");
-  }
+    const product = productSnap.data();
 
-  // 1. STOCK MOVEMENT (SOURCE DE VÉRITÉ)
-  await addDoc(collection(db, "stock_movements"), {
-    productId,
-    type: "OUT",
-    quantity: quantityLost,
-    reason: "loss",
-    referenceId: null,
-    createdBy: userId,
-    createdAt: now
-  });
+    if (quantityLost > product.stock_current) {
+      alert("Stock insuffisant");
+      return;
+    }
 
-  // 2. UPDATE CACHE
-  await updateDoc(productRef, {
-    stock_current: product.stock_current - quantityLost,
-    updatedAt: now
-  });
-
-  // 3. EXPENSE
-  await addDoc(collection(db, "expenses"), {
-    label: `Perte produit ${product.name}`,
-    category: "loss",
-    amount: quantityLost * product.price_buy,
-    type: "variable",
-    relatedTo: productId,
-    createdAt: now,
-    createdBy: userId
-  });
-
-  // 4. LOG
-  await addDoc(collection(db, "logs"), {
-    userId,
-    action: "loss_product",
-    targetId: productId,
-    details: {
+    await addDoc(collection(db, "stock_movements"), {
+      productId,
+      type: "OUT",
       quantity: quantityLost,
-      reason
-    },
-    createdAt: now
-  });
+      reason: reason,
+      createdBy: userId,
+      createdAt: now
+    });
 
-  lossProductForm.reset();
+    await updateDoc(productRef, {
+      stock_current: product.stock_current - quantityLost,
+      updatedAt: now
+    });
+
+    await addDoc(collection(db, "expenses"), {
+      label: `Perte produit ${product.name}`,
+      category: "loss",
+      amount: (quantityLost * product.price_buy) || 0,
+      type: "variable",
+      relatedTo: productId,
+      createdAt: now,
+      createdBy: userId
+    });
+
+    await addDoc(collection(db, "logs"), {
+      userId,
+      action: "loss_product",
+      targetId: productId,
+      details: { quantity: quantityLost, reason },
+      createdAt: now
+    });
+
+    alert("OK");
+    lossProductForm.reset();
+    await loadLosses();
+
+  } catch (err) {
+    console.error("CRASH:", err);
+    alert("Erreur réelle (voir console)");
+  }
 });
 
 // ARGENT
 lossMoneyForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const amount = parseFloat(document.getElementById('moneyLostAmount').value);
-  const reason = document.getElementById('moneyLossReason').value;
+  try {
 
-  if (amount <= 0) return alert("Montant invalide");
+    const amount = parseFloat(document.getElementById('moneyLostAmount').value);
+    const reason = document.getElementById('moneyLossReason').value;
 
-  const now = serverTimestamp();
-  const userId = "CURRENT_USER_ID";
+    if (amount <= 0) {
+      alert("Montant invalide");
+      return;
+    }
 
-  // 1. EXPENSE
-  await addDoc(collection(db, "expenses"), {
-    label: "Perte d'argent",
-    category: "loss",
-    amount,
-    type: "variable",
-    relatedTo: null,
-    createdAt: now,
-    createdBy: userId
-  });
+    const now = serverTimestamp();
+    const userId = "CURRENT_USER_ID";
 
-  // 2. LOG
-  await addDoc(collection(db, "logs"), {
-    userId,
-    action: "loss_money",
-    targetId: null,
-    details: {
+    await addDoc(collection(db, "expenses"), {
+      label: "Perte d'argent",
+      category: "loss",
       amount,
-      reason
-    },
-    createdAt: now
-  });
+      type: "variable",
+      relatedTo: null,
+      createdAt: now,
+      createdBy: userId
+    });
 
-  lossMoneyForm.reset();
+    await addDoc(collection(db, "logs"), {
+      userId,
+      action: "loss_money",
+      targetId: null,
+      details: { amount, reason },
+      createdAt: now
+    });
+
+    alert("OK");
+    lossMoneyForm.reset();
+
+  } catch (err) {
+    console.error(err);
+    alert("Erreur");
+  }
 });
 
 let productsMap = {};
@@ -167,12 +182,19 @@ async function loadLosses() {
 const name = p
   ? `${p.name} ${p.variant ? "(" + p.variant + ")" : ""}`
   : `[ID:${loss.productId}]`;
+const reasonLabel = {
+  loss: "Perte / vol",
+  break: "Casse",
+  stock_error: "Erreur stock",
+  other: "Autre",
+  correction_loss: "Correction"
+};
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${name}</td>
       <td>${loss.quantity}</td>
-      <td>${loss.reason}</td>
+      <td>${reasonLabel[loss.reason] || loss.reason}</td>
       <td>${loss.createdAt?.toDate().toLocaleString() || ''}</td>
       <td>
         <button onclick="correctLoss('${loss.productId}', ${loss.quantity})">
@@ -213,7 +235,12 @@ window.correctLoss = async (productId, quantityToRestore) => {
 });
 
 // recalcul réel
-const movements = await getDocs(collection(db, "stock_movements"));
+const q = query(
+  collection(db, "stock_movements"),
+  where("productId", "==", productId)
+);
+
+const movements = await getDocs(q);
 
 const stock = movements.docs
   .map(d => d.data())
