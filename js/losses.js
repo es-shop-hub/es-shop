@@ -145,7 +145,6 @@ opt.textContent =
   `${p.name || "Sans nom"}${p.variant ? ` (${p.variant})` : ""}`;
 
 productSelect.appendChild(opt);
-
   });
 }
 
@@ -157,7 +156,9 @@ async function loadLosses() {
 
   const losses = snapshot.docs
     .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
-    .filter(d => ["loss", "correction_loss"].includes(d.reason))
+    .filter(d =>
+  ["loss", "break", "stock_error", "other", "correction_loss"].includes(d.reason ||"")
+)
     .sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
 
   losses.forEach(loss => {
@@ -254,10 +255,12 @@ await updateDoc(productRef, {
 // --- Init ---
 async function init() {
   try {
-      await loadProductsMap();   // map d'abord 
-    await loadProducts();      // UI ensuite 
-    
-    await loadLosses();        // affichage final
+      await Promise.all([
+          loadProductsMap(),
+      loadProducts()
+      ]);
+
+      await loadLosses();
   } catch (e) {
     console.error("INIT ERROR:", e);
   }
