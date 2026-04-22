@@ -7,7 +7,6 @@ const lossMoneyForm = document.getElementById('lossMoneyForm');
 const lossTableBody = document.querySelector('#lossTable tbody');
 
 
-const stockCollection = collection(db, 'stock');
 const stockMovementsCol = collection(db, 'stock_movements');
 
 const productSelect = document.getElementById("productSelect");
@@ -174,7 +173,7 @@ async function loadLosses() {
     .filter(d =>
   ["loss", "break", "stock_error", "other", "correction_loss"].includes(d.reason ||"")
 )
-    .sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
+    .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
 
   losses.forEach(loss => {
     const p = productsMap[loss.productId];
@@ -244,7 +243,6 @@ const movements = await getDocs(q);
 
 const stock = movements.docs
   .map(d => d.data())
-  .filter(m => m.productId === productId)
   .reduce((acc, m) => {
     const qty = Number(m.quantity || 0);
 
@@ -271,7 +269,7 @@ await updateDoc(productRef, {
     });
 
     alert("Correction produit effectuée");
-    loadLosses();
+    await loadLosses();
 
   } catch (err) {
     console.error(err);
