@@ -1,69 +1,178 @@
-import { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from './firebase.js';
+// losses.js version finale  (correction 2)
+import { db, collection, addDoc, doc, updateDoc, deleteDoc, getDocs, getDoc, serverTimestamp } from './firebase.js';
 
-const lossForm = document.getElementById('lossForm');
+const lossProductForm = document.getElementById('lossProductForm');
+const lossMoneyForm = document.getElementById('lossMoneyForm');
 const lossTableBody = document.querySelector('#lossTable tbody');
 
-const stockCollection = collection(db, 'stock');
-const stockHistoryCollection = collection(db, 'stockHistory');
-const lossesCollection = collection(db, 'losses'); // Optionnel pour tracking dédié
 
-// --- Déclarer une perte ---
-lossForm.addEventListener('submit', async (e) => {
+const stockCollection = collection(db, 'stock');
+const stockMovementsCol = collection(db, 'stock_movements');
+
+const productSelect = document.getElementById("productSelect");
+
+//-------- form --------
+
+// PRODUIT
+lossProductForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const productName = document.getElementById('productName').value.trim();
-  const quantityLost = parseInt(document.getElementById('quantityLost').value);
-  const reason = document.getElementById('reason').value;
+  const productId = productSelect.value;
+  const quantityLost = parseInt(document.getElementById('productQuantityLost').value);
+  const reason = document.getElementById('productLossReason').value;
 
-  if (!productName || quantityLost <= 0) return alert("Remplir tous les champs correctement.");
+  if (!productId || quantityLost <= 0) return alert("Valeurs invalides");
 
-  // Chercher le produit dans le stock
-  const stockSnapshot = await getDocs(stockCollection);
-  const productDoc = stockSnapshot.docs.find(d => d.data().productName === productName);
+  const now = serverTimestamp();
+  const userId = "CURRENT_USER_ID"; // remplace par ton auth
 
-  if (!productDoc) return alert("Produit introuvable dans le stock.");
+  const productRef = doc(db, "products", productId);
+  const productSnap = await getDoc(productRef);
 
-  const currentQty = productDoc.data().quantity;
-  const newQty = currentQty - quantityLost;
-  if (newQty < 0) return alert("Quantité insuffisante dans le stock pour cette perte.");
+  if (!productSnap.exists()) return alert("Produit introuvable");
 
-  // Mettre à jour le stock
-  await updateDoc(doc(db, 'stock', productDoc.id), { quantity: newQty });
+  const product = productSnap.data();
 
-  // Ajouter la perte dans stockHistory
-  const lossEntry = {
-    productName,
+  if (quantityLost > product.stock_current) {
+    return alert("Stock insuffisant");
+  }
+
+  // 1. STOCK MOVEMENT (SOURCE DE VÉRITÉ)
+  await addDoc(collection(db, "stock_movements"), {
+    productId,
+    type: "OUT",
     quantity: quantityLost,
-    type: 'loss',
-    reason,
-    timestamp: serverTimestamp()
-  };
-  const stockHistoryDoc = await addDoc(stockHistoryCollection, lossEntry);
-  await addDoc(lossesCollection, { ...lossEntry, historyId: stockHistoryDoc.id });
+    reason: "loss",
+    referenceId: null,
+    createdBy: userId,
+    createdAt: now
+  });
 
-  lossForm.reset();
-  loadLosses();
+  // 2. UPDATE CACHE
+  await updateDoc(productRef, {
+    stock_current: product.stock_current - quantityLost,
+    updatedAt: now
+  });
+
+  // 3. EXPENSE
+  await addDoc(collection(db, "expenses"), {
+    label: `Perte produit ${product.name}`,
+    category: "loss",
+    amount: quantityLost * product.price_buy,
+    type: "variable",
+    relatedTo: productId,
+    createdAt: now,
+    createdBy: userId
+  });
+
+  // 4. LOG
+  await addDoc(collection(db, "logs"), {
+    userId,
+    action: "loss_product",
+    targetId: productId,
+    details: {
+      quantity: quantityLost,
+      reason
+    },
+    createdAt: now
+  });
+
+  lossProductForm.reset();
 });
+
+// ARGENT
+lossMoneyForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const amount = parseFloat(document.getElementById('moneyLostAmount').value);
+  const reason = document.getElementById('moneyLossReason').value;
+
+  if (amount <= 0) return alert("Montant invalide");
+
+  const now = serverTimestamp();
+  const userId = "CURRENT_USER_ID";
+
+  // 1. EXPENSE
+  await addDoc(collection(db, "expenses"), {
+    label: "Perte d'argent",
+    category: "loss",
+    amount,
+    type: "variable",
+    relatedTo: null,
+    createdAt: now,
+    createdBy: userId
+  });
+
+  // 2. LOG
+  await addDoc(collection(db, "logs"), {
+    userId,
+    action: "loss_money",
+    targetId: null,
+    details: {
+      amount,
+      reason
+    },
+    createdAt: now
+  });
+
+  lossMoneyForm.reset();
+});
+
+let productsMap = {};
+
+async function loadProductsMap() {
+  const snap = await getDocs(collection(db, "products"));
+
+  snap.forEach(docSnap => {
+    productsMap[docSnap.id] = docSnap.data();
+  });
+}
+
+// loadLosses
+async function loadProducts() {
+  const snap = await getDocs(collection(db, "products"));
+
+  productSelect.innerHTML = "";
+
+  snap.forEach(docSnap => {
+    const p = docSnap.data();
+
+    const opt = document.createElement("option");
+    opt.value = docSnap.id;
+    opt.textContent = `${p.name} ${p.variant ? "(" + p.variant + ")" : ""}`;
+
+    productSelect.appendChild(opt);
+  });
+}
 
 // --- Charger historique pertes ---
 async function loadLosses() {
   lossTableBody.innerHTML = '';
-  const snapshot = await getDocs(stockHistoryCollection);
+
+  const snapshot = await getDocs(stockMovementsCol);
+
   const losses = snapshot.docs
     .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
-    .filter(d => d.type === 'loss')
-    .sort((a,b) => b.timestamp?.seconds - a.timestamp?.seconds); // plus récent en haut
+    .filter(d => d.reason?.includes("loss"))
+    .sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
 
   losses.forEach(loss => {
+    const p = productsMap[loss.productId];
+
+const name = p
+  ? `${p.name} ${p.variant ? "(" + p.variant + ")" : ""}`
+  : `[ID:${loss.productId}]`;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${loss.productName}</td>
+      <td>${name}</td>
       <td>${loss.quantity}</td>
       <td>${loss.reason}</td>
-      <td>${loss.timestamp?.toDate().toLocaleString() || ''}</td>
+      <td>${loss.createdAt?.toDate().toLocaleString() || ''}</td>
       <td>
-        <button onclick="editLoss('${loss.id}')">Modifier</button>
-        <button onclick="deleteLoss('${loss.id}')">Supprimer</button>
+        <button onclick="correctLoss('${loss.productId}', ${loss.quantity})">
+          Corriger
+        </button>
       </td>
     `;
     lossTableBody.appendChild(tr);
@@ -71,62 +180,66 @@ async function loadLosses() {
 }
 
 // --- Modifier une perte ---
-window.editLoss = async (id) => {
-  const docRef = doc(db, 'stockHistory', id);
-  const docSnap = await getDocs(collection(db, 'stockHistory'));
-  const lossDoc = docSnap.docs.find(d => d.id === id);
-  if (!lossDoc) return alert("Perte introuvable.");
-
-  const data = lossDoc.data();
-  const newName = prompt("Produit :", data.productName) || data.productName;
-  const newQty = parseInt(prompt("Quantité :", data.quantity) || data.quantity);
-  const newReason = prompt("Raison :", data.reason) || data.reason;
-
-  if (!newName || newQty <= 0) return alert("Champs invalides.");
-
-  // Ajuster le stock : remettre l'ancienne quantité et retirer la nouvelle
-  const stockSnap = await getDocs(stockCollection);
-  const productDoc = stockSnap.docs.find(d => d.data().productName === data.productName);
-  if (!productDoc) return alert("Produit introuvable pour mise à jour stock.");
-
-  let currentQty = productDoc.data().quantity;
-  currentQty += data.quantity; // remettre quantité précédente
-  const updatedQty = currentQty - newQty;
-  if (updatedQty < 0) return alert("Stock insuffisant pour cette modification.");
-
-  await updateDoc(doc(db, 'stock', productDoc.id), { quantity: updatedQty });
-  await updateDoc(docRef, { productName: newName, quantity: newQty, reason: newReason });
-
-  loadLosses();
-};
-
-// --- Supprimer une perte ---
-window.deleteLoss = async (id) => {
-  if (!confirm("Supprimer définitivement cette perte ?")) return;
-
-  const docRef = doc(db, 'stockHistory', id);
-  const docSnap = await getDocs(collection(db, 'stockHistory'));
-  const lossDoc = docSnap.docs.find(d => d.id === id);
-  if (!lossDoc) return alert("Perte introuvable.");
-
-  // Restituer le stock
-  const data = lossDoc.data();
-  const stockSnap = await getDocs(stockCollection);
-  const productDoc = stockSnap.docs.find(d => d.data().productName === data.productName);
-  if (productDoc) {
-    const currentQty = productDoc.data().quantity;
-    await updateDoc(doc(db, 'stock', productDoc.id), { quantity: currentQty + data.quantity });
+window.correctLoss = async (productId, quantityToRestore) => {
+  if (!productId || quantityToRestore <= 0) {
+    return alert("Données invalides");
   }
 
-  await deleteDoc(docRef);
+  const now = serverTimestamp();
 
-  // Supprimer entrée correspondante dans losses si existante
-  const lossesSnap = await getDocs(lossesCollection);
-  const linkedLoss = lossesSnap.docs.find(d => d.data().historyId === id);
-  if (linkedLoss) await deleteDoc(doc(db, 'losses', linkedLoss.id));
+  try {
+    // 1. récupérer produit
+    const productRef = doc(db, "products", productId);
+    const productSnap = await getDoc(productRef);
 
-  loadLosses();
+    if (!productSnap.exists()) {
+      return alert("Produit introuvable");
+    }
+
+    const product = productSnap.data();
+
+    // 2. mouvement inverse (IN)
+    await addDoc(collection(db, "stock_movements"), {
+      productId,
+      type: "IN",
+      quantity: quantityToRestore,
+      reason: "correction_loss",
+      createdAt: now
+    });
+
+    // 3. update cache stock
+    await updateDoc(productRef, {
+      stock_current: (product.stock_current || 0) + quantityToRestore,
+      updatedAt: now
+    });
+
+    // 4. log
+    await addDoc(collection(db, "logs"), {
+      action: "loss_corrected",
+      targetId: productId,
+      details: {
+        quantityRestored: quantityToRestore
+      },
+      createdAt: now
+    });
+
+    alert("Correction produit effectuée");
+    loadLosses();
+
+  } catch (err) {
+    console.error(err);
+    alert("Erreur correction");
+  }
 };
 
 // --- Init ---
-loadLosses();
+async function init() {
+  await Promise.all([
+    loadProductsMap(),
+    loadProducts()
+  ]);
+
+  await loadLosses();
+}
+
+init();
