@@ -1,4 +1,4 @@
-// losses.js version finale  (correction 2)
+// losses.js version finale (correction 3)
 import { db, collection, addDoc, doc, updateDoc, deleteDoc, getDocs, getDoc, serverTimestamp } from './firebase.js';
 
 const lossProductForm = document.getElementById('lossProductForm');
@@ -138,10 +138,14 @@ async function loadProducts() {
     const p = docSnap.data();
 
     const opt = document.createElement("option");
-    opt.value = docSnap.id;
-    opt.textContent = `${p.name} ${p.variant ? "(" + p.variant + ")" : ""}`;
 
-    productSelect.appendChild(opt);
+opt.value = docSnap.id;
+
+opt.textContent =
+  `${p.name || "Sans nom"}${p.variant ? ` (${p.variant})` : ""}`;
+
+productSelect.appendChild(opt);
+
   });
 }
 
@@ -153,7 +157,7 @@ async function loadLosses() {
 
   const losses = snapshot.docs
     .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
-    .filter(d => d.reason?.includes("loss"))
+    .filter(d => ["loss", "correction_loss"].includes(d.reason))
     .sort((a,b) => b.createdAt?.seconds - a.createdAt?.seconds);
 
   losses.forEach(loss => {
@@ -200,18 +204,33 @@ window.correctLoss = async (productId, quantityToRestore) => {
 
     // 2. mouvement inverse (IN)
     await addDoc(collection(db, "stock_movements"), {
-      productId,
-      type: "IN",
-      quantity: quantityToRestore,
-      reason: "correction_loss",
-      createdAt: now
-    });
+  productId,
+  type: "IN",
+  quantity: quantityToRestore,
+  reason: "correction_loss",
+  createdAt: now
+});
 
-    // 3. update cache stock
-    await updateDoc(productRef, {
-      stock_current: (product.stock_current || 0) + quantityToRestore,
-      updatedAt: now
-    });
+// recalcul réel
+const movements = await getDocs(collection(db, "stock_movements"));
+
+const stock = movements.docs
+  .map(d => d.data())
+  .filter(m => m.productId === productId)
+  .reduce((acc, m) => {
+    const qty = Number(m.quantity || 0);
+
+    if (!qty) return acc;
+
+    return m.type === "IN"
+      ? acc + qty
+      : acc - qty;
+  }, 0);
+
+await updateDoc(productRef, {
+  stock_current: stock,
+  updatedAt: now
+});
 
     // 4. log
     await addDoc(collection(db, "logs"), {
@@ -234,12 +253,14 @@ window.correctLoss = async (productId, quantityToRestore) => {
 
 // --- Init ---
 async function init() {
-  await Promise.all([
-    loadProductsMap(),
-    loadProducts()
-  ]);
-
-  await loadLosses();
+  try {
+      await loadProductsMap();   // map d'abord 
+    await loadProducts();      // UI ensuite 
+    
+    await loadLosses();        // affichage final
+  } catch (e) {
+    console.error("INIT ERROR:", e);
+  }
 }
 
 init();
