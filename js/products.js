@@ -1,4 +1,4 @@
-// products.js - VERSION FINALE ULTIME PRO
+// products.js - VERSION FINALE ULTIME PRO + search 
 import { 
   db, collection, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, enableIndexedDbPersistence, query, where
 } from './firebase.js';
@@ -10,6 +10,23 @@ enableIndexedDbPersistence(db).catch(err => console.warn("Offline non dispo:", e
 // --- DOM ---
 const tableBody = document.getElementById('products-table');
 const addBtn = document.querySelector('.add-product button');
+const searchInput = document.getElementById('searchInput');
+let allProducts = [];
+
+function applySearch(value) {
+  const v = value.toLowerCase().trim();
+
+  const filtered = allProducts.filter(docSnap => {
+    const p = docSnap.data();
+
+    return (
+      p.name?.toLowerCase().includes(v) ||
+      p.variant?.toLowerCase().includes(v)
+    );
+  });
+
+  renderProducts(filtered);
+}
 
 // --- AUTH ---
 const auth = getAuth();
@@ -40,19 +57,19 @@ async function recalcStock(productId) {
   return total;
 }
 
-// --- LOAD PRODUCTS ---
-async function loadProducts() {
-  const prodSnap = await getDocs(collection(db, "products"));
+// ------ render
+function renderProducts(productsDocs) {
   tableBody.innerHTML = "";
-  prodSnap.forEach(docSnap => {
+
+  productsDocs.forEach(docSnap => {
     const p = docSnap.data();
-    if (!p.isActive) return;
 
     const priceSell = p.price_sell ?? 0;
     const priceMin = p.price_min ?? priceSell;
     const stockCurrent = p.stock_current ?? 0;
 
     const tr = document.createElement('tr');
+
     tr.innerHTML = `
       <td><div class="product-img" style="background-image:url('${p.imageUrl || ''}')"></div></td>
       <td>${p.name}</td>
@@ -66,11 +83,40 @@ async function loadProducts() {
       </td>
     `;
 
-    tr.querySelector('.btn-edit').addEventListener('click', () => editProduct(docSnap.id, p));
-    tr.querySelector('.btn-delete').addEventListener('click', () => deactivateProduct(docSnap.id, p.name));
+    tr.querySelector('.btn-edit').onclick = () => editProduct(docSnap.id, p);
+    tr.querySelector('.btn-delete').onclick = () => deactivateProduct(docSnap.id, p.name);
 
     tableBody.appendChild(tr);
   });
+}
+
+// search box 
+if (searchInput) {
+  searchInput.addEventListener("input", (e) => {
+    const value = e.target.value.toLowerCase().trim();
+
+    const filtered = allProducts.filter(docSnap => {
+      const p = docSnap.data();
+
+      return (
+        p.name?.toLowerCase().includes(value) ||
+        p.variant?.toLowerCase().includes(value)
+      );
+    });
+
+    renderProducts(filtered);
+  });
+}
+
+// --- LOAD PRODUCTS ---
+async function loadProducts() {
+  const prodSnap = await getDocs(collection(db, "products"));
+
+  allProducts = prodSnap.docs.filter(d => d.data().isActive);
+
+  if (searchInput) searchInput.value = ""; // reset search
+
+  renderProducts(allProducts);
 }
 
 // --- ADD PRODUCT ---
