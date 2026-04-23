@@ -58,12 +58,10 @@ async function recalcStock(productId) {
 }
 
 // ------ render
-function renderProducts(productsDocs) {
+function renderProducts(products) {
   tableBody.innerHTML = "";
 
-  productsDocs.forEach(docSnap => {
-    const p = docSnap.data();
-
+  products.forEach(p => {
     const priceSell = p.price_sell ?? 0;
     const priceMin = p.price_min ?? priceSell;
     const stockCurrent = p.stock_current ?? 0;
@@ -83,8 +81,8 @@ function renderProducts(productsDocs) {
       </td>
     `;
 
-    tr.querySelector('.btn-edit').onclick = () => editProduct(docSnap.id, p);
-    tr.querySelector('.btn-delete').onclick = () => deactivateProduct(docSnap.id, p.name);
+    tr.querySelector('.btn-edit').onclick = () => editProduct(p.id, p);
+    tr.querySelector('.btn-delete').onclick = () => deactivateProduct(p.id, p.name);
 
     tableBody.appendChild(tr);
   });
@@ -95,13 +93,11 @@ if (searchInput) {
   searchInput.addEventListener("input", (e) => {
     const value = e.target.value.toLowerCase().trim();
 
-    const filtered = allProducts.filter(docSnap => {
-      const p = docSnap.data();
+    const filtered = allProducts.filter(p => {
+      const name = (p.name || "").toLowerCase();
+      const variant = (p.variant || "").toLowerCase();
 
-      return (
-        p.name?.toLowerCase().includes(value) ||
-        p.variant?.toLowerCase().includes(value)
-      );
+      return name.includes(value) || variant.includes(value);
     });
 
     renderProducts(filtered);
@@ -112,9 +108,14 @@ if (searchInput) {
 async function loadProducts() {
   const prodSnap = await getDocs(collection(db, "products"));
 
-  allProducts = prodSnap.docs.filter(d => d.data().isActive);
+  allProducts = prodSnap.docs
+    .filter(d => d.data().isActive)
+    .map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
 
-  if (searchInput) searchInput.value = ""; // reset search
+  if (searchInput) searchInput.value = "";
 
   renderProducts(allProducts);
 }
