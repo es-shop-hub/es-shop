@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Gestion des Dépenses</title>
+
+<style>
+:root {
+  --primary: #0B5FFF;
+  --dark: #111;
+  --light: #f5f7fa;
+  --danger: #e74c3c;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--light);
+}
+
+/* HEADER */
+.header {
+  background: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.header h2 {
+  margin: 0;
+}
+
+/* CONTAINER */
+.container {
+  padding: 20px;
+  max-width: 900px;
+  margin: auto;
+}
+
+/* FORM */
+.form-box {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.form-box h3 {
+  margin-top: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.form-grid input,
+.form-grid select,
+.form-grid textarea {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  width: 100%;
+}
+
+textarea {
+  grid-column: span 2;
+  resize: none;
+}
+
+.btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.btn:hover {
+  background: #0847c2;
+}
+
+/* LIST */
+.list {
+  background: white;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.expense-item {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee;
+  padding: 10px 0;
+}
+
+.expense-item:last-child {
+  border-bottom: none;
+}
+
+.expense-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.expense-amount {
+  font-weight: bold;
+  color: var(--danger);
+}
+
+/* TOTAL */
+.total-box {
+  margin-top: 15px;
+  font-weight: bold;
+  text-align: right;
+}
+/* NAV */
+  nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #111;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    color: white;
+    z-index: 1000;
+  }
+  nav div { text-align: center; font-size: 12px; cursor: pointer; transition: 0.2s; }
+  nav div:hover { color: #D4AF37; }
+  nav div.active { color: #D4AF37; font-weight: bold; }
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <h2>Dépenses</h2>
+</div>
+
+<div class="container">
+
+  <!-- FORM -->
+  <div class="form-box">
+    <h3>Ajouter une dépense</h3>
+
+    <div class="form-grid">
+      <input type="text" id="label" placeholder="Ex: Salaire employé">
+      
+      <select id="category">
+        <option value="salary">Salaire</option>
+        <option value="tax">Taxe</option>
+        <option value="maintenance">Maintenance</option>
+        <option value="rent">Loyer</option>
+        <option value="other">Autre</option>
+      </select>
+
+      <input type="number" id="amount" placeholder="Montant">
+
+      <select id="type">
+        <option value="fixed">Fixe</option>
+        <option value="variable">Variable</option>
+      </select>
+
+      <input type="text" id="relatedTo" placeholder="Lié à (optionnel)">
+
+      <textarea id="note" placeholder="Note (optionnel)"></textarea>
+    </div>
+
+    <button class="btn" id="addExpenseBtn">Ajouter dépense</button>
+  </div>
+  <div class="form-box">
+
+  <input type="text" id="searchInput" placeholder="🔍 Rechercher une dépense...">
+
+  <select id="filterCategory">
+    <option value="all">Toutes catégories</option>
+    <option value="salary">Salaire</option>
+    <option value="tax">Taxe</option>
+    <option value="maintenance">Maintenance</option>
+    <option value="rent">Loyer</option>
+    <option value="vol">Vol d'argent</option>
+      <option value="faux_billet">Faux billet</option>
+     <option value="erreur_caisse">Erreur de caisse</option>
+<option value="other">Autre</option>
+  </select>
+
+</div>
+<div class="form-box">
+<label>Début de la période</label>
+<input type="date" id="startDate"><br>
+<label>Fin de la période</label>
+<input type="date" id="endDate">
+<!--
+<button class="btn" id="applyFilters">Filtrer période</button> -->
+</div>
+
+    <div class="form-box">
+      <button class="btn" id="exportExcel">📊 Export Excel</button>
+      <button class="btn" id="exportPDF">📄 Export PDF</button>
+    </div>
+  <!-- LIST -->
+  <div class="list" id="expensesList">
+    <!-- JS inject -->
+  </div>
+
+  <div class="total-box" id="totalExpenses">
+    Total: 0$
+  </div>
+    <div>
+    <br><br><br>
+  </div>
+</div>
+<!-- NAVIGATION GLOBALE -->
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="pages.html">🔗 Navigation</div>
+  <div class="nav-item" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item active" data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<!-- JS -->
+<script type="module" src="js/expenses.js"></script>
+<script src="js/nav.js"></script>
+</body>
+</html>
