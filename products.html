@@ -20,10 +20,7 @@ body {
   line-height: 1.4;
   overflow-x: auto;
 }
-.page {
-  width: max-content;
-  min-width: 100%;
-}
+
 /* --- HEADER --- */
 header {
   background: #0B3D2E;
@@ -123,6 +120,10 @@ tr:hover { background: #f0f8ff; }
 .add-product button:hover {
   background: #093022;
 }
+.page {
+  width: max-content;
+  min-width: 100%;
+}
 
 /* --- NAVIGATION --- */
 nav {
@@ -206,6 +207,20 @@ nav div.active {
 .debts-btn:hover {
   background: #e69a00;
     }
+    
+    .search-box {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.search-box input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  width: 250px;
+  font-size: 13px;
+}
 </style>
 </head>
 
@@ -219,6 +234,10 @@ nav div.active {
   <a href="login.html" class="btn">Connexion</a>
   <a href="signup.html" class="btn">Inscription</a>
   <a href="debts.html" class="debts-btn">Dettes</a>
+</div>
+
+<div class="search-box">
+  <input type="text" id="searchInput" placeholder="Rechercher produit...">
 </div>
 
 <div class="container">
