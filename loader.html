@@ -99,7 +99,6 @@ button{
     <div class="big" id="in">0</div>
   </div>
 </div>
-
 <script type="module">
 import { db } from "./js/firebase.js";
 import {
@@ -117,28 +116,25 @@ let data = {
   stock: []
 };
 
-/* ================= SAFE DATE ================= */
+/* ================= SAFE TO DATE (CRUCIAL FIX) ================= */
 function toDate(t){
   if (!t) return null;
 
-  if (t?.toDate) return t.toDate();
+  if (typeof t?.toDate === "function") return t.toDate();
 
   const d = new Date(t);
   return isNaN(d.getTime()) ? null : d;
 }
 
 /* ================= SAFE NUMBER ================= */
-const n = (v) => {
-  const num = Number(v);
-  return isNaN(num) ? 0 : num;
-};
+const n = (v) => Number(v) || 0;
 
 /* ================= AUTH ================= */
 onAuthStateChanged(auth, async (user)=>{
   if(!user) return location.href="login.html";
 
   await load();
-  applyDefault7Days(); // 🔥 IMPORTANT
+  applyDefault7Days();
 });
 
 /* ================= LOAD ================= */
@@ -154,9 +150,12 @@ async function load(){
     data.expenses = expSnap.docs.map(d => d.data());
     data.stock = stockSnap.docs.map(d => d.data());
 
-    console.log("DATA LOADED:", data); // 🔥 debug utile
+    alert("🔥 SALES SAMPLE:", data.sales[0]);
+    alert("🔥 EXPENSE SAMPLE:", data.expenses[0]);
+    alert("🔥 STOCK SAMPLE:", data.stock[0]);
 
     render();
+
   } catch (err) {
     console.error("LOAD ERROR:", err);
   }
@@ -184,46 +183,46 @@ function applyDefault7Days(){
   const start = new Date();
   start.setDate(now.getDate() - 7);
 
-  const startInput = document.getElementById("start");
-  const endInput = document.getElementById("end");
-
-  if (startInput) startInput.valueAsDate = start;
-  if (endInput) endInput.valueAsDate = now;
+  document.getElementById("start").valueAsDate = start;
+  document.getElementById("end").valueAsDate = now;
 
   render();
 }
 
-/* ================= RENDER ================= */
+/* ================= CORE RENDER ================= */
 function render(){
-  const start = document.getElementById("start")?.value;
-  const end = document.getElementById("end")?.value;
+  const start = document.getElementById("start").value;
+  const end = document.getElementById("end").value;
 
   const sales = filterRange(data.sales, start, end);
   const expenses = filterRange(data.expenses, start, end);
   const stock = filterRange(data.stock, start, end);
 
+  /* ================= DEBUG IMPORTANT ================= */
+  console.log("FILTERED SALES:", sales.length);
+  console.log("FILTERED EXP:", expenses.length);
+  console.log("FILTERED STOCK:", stock.length);
+
   /* ================= CALCULS ================= */
 
-  const totalSales = sales.reduce((a,s)=>a + n(s.total_amount),0);
-  const profit = sales.reduce((a,s)=>a + n(s.total_profit),0);
-  const exp = expenses.reduce((a,e)=>a + n(e.amount),0);
+  const totalSales = sales.reduce((a,s)=> a + n(s.total_amount),0);
+  const profit = sales.reduce((a,s)=> a + n(s.total_profit),0);
+  const exp = expenses.reduce((a,e)=> a + n(e.amount),0);
 
   const inStock = stock
     .filter(s => s.type === "IN")
-    .reduce((a,s)=>a + n(s.quantity),0);
+    .reduce((a,s)=> a + n(s.quantity),0);
 
   const outStock = stock
     .filter(s => s.type === "OUT")
-    .reduce((a,s)=>a + n(s.quantity),0);
-
-  const soldQty = sales.length;
+    .reduce((a,s)=> a + n(s.quantity),0);
 
   /* ================= UI ================= */
   document.getElementById("sales").textContent = totalSales + " FC";
   document.getElementById("profit").textContent = (profit - exp) + " FC";
   document.getElementById("expenses").textContent = exp + " FC";
 
-  document.getElementById("sold").textContent = soldQty;
+  document.getElementById("sold").textContent = sales.length;
   document.getElementById("in").textContent = inStock;
   document.getElementById("out").textContent = outStock;
 }
@@ -231,19 +230,17 @@ function render(){
 /* ================= EVENTS ================= */
 document.getElementById("apply").onclick = render;
 
-/* ================= EXPORT CSV ================= */
+/* ================= EXPORT ================= */
 document.getElementById("export").onclick = () => {
-  const rows = [
-    ["Type","Value"],
-    ["Sales", document.getElementById("sales").textContent],
-    ["Profit", document.getElementById("profit").textContent],
-    ["Expenses", document.getElementById("expenses").textContent],
-    ["Sold Qty", document.getElementById("sold").textContent],
-    ["Stock IN", document.getElementById("in").textContent],
-    ["Stock OUT", document.getElementById("out").textContent]
-  ];
-
-  const csv = rows.map(r => r.join(",")).join("\n");
+  const csv = [
+    "Metric,Value",
+    `Sales,${document.getElementById("sales").textContent}`,
+    `Profit,${document.getElementById("profit").textContent}`,
+    `Expenses,${document.getElementById("expenses").textContent}`,
+    `Sold,${document.getElementById("sold").textContent}`,
+    `IN,${document.getElementById("in").textContent}`,
+    `OUT,${document.getElementById("out").textContent}`
+  ].join("\n");
 
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
