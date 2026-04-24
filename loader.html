@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loader Stats</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #f5f7fa;
+  margin: 0;
+  padding: 20px;
+}
+
+.box {
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+input, button {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+button {
+  background: #0B5FFF;
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #eee;
+}
+</style>
+</head>
+
+<body>
+
+<h2>📊 Mini Stats Loader</h2>
+
+<div class="box row">
+  <input type="date" id="startDate">
+  <input type="date" id="endDate">
+  <button id="filterBtn">Filtrer</button>
+  <button id="exportBtn">Exporter CSV</button>
+</div>
+
+<div class="box">
+  <b>Résumé :</b>
+  <div id="summary">Chargement...</div>
+</div>
+
+<div class="box" id="list"></div>
+
+<script type="module">
+import { db } from './js/firebase.js';
+import {
+  getAuth,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  doc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+const auth = getAuth();
+
+let all = [];
+let filtered = [];
+
+const list = document.getElementById("list");
+const summary = document.getElementById("summary");
+
+let currentUser = null;
+
+/* =========================
+   AUTH + ROLE CHECK
+========================= */
+onAuthStateChanged(auth, async (user) => {
+  if (!user) return location.href = "login.html";
+
+  currentUser = user;
+
+  const uSnap = await getDoc(doc(db, "users", user.uid));
+
+  if (!uSnap.exists()) {
+    alert("User introuvable");
+    return;
+  }
+
+  const role = uSnap.data().role;
+
+  if (role !== "admin" && role !== "seller") {
+    alert("Accès refusé");
+    return;
+  }
+
+  await loadData();
+});
+
+/* =========================
+   LOAD MOVEMENTS (7 jours default)
+========================= */
+async function loadData() {
+  const q = query(collection(db, "stock_movements"), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+
+  all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  applyFilter7Days();
+}
+
+/* =========================
+   FILTER 7 DAYS DEFAULT
+========================= */
+function applyFilter7Days() {
+  const now = new Date();
+  const start = new Date();
+  start.setDate(now.getDate() - 7);
+
+  filtered = all.filter(m => {
+    const d = m.createdAt?.toDate?.();
+    if (!d) return false;
+    return d >= start && d <= now;
+  });
+
+  render();
+}
+
+/* =========================
+   CUSTOM FILTER
+========================= */
+document.getElementById("filterBtn").onclick = () => {
+  const startVal = document.getElementById("startDate").value;
+  const endVal = document.getElementById("endDate").value;
+
+  filtered = all.filter(m => {
+    const d = m.createdAt?.toDate?.();
+    if (!d) return false;
+
+    if (startVal && d < new Date(startVal)) return false;
+    if (endVal && d > new Date(endVal)) return false;
+
+    return true;
+  });
+
+  render();
+};
+
+/* =========================
+   RENDER
+========================= */
+function render() {
+  list.innerHTML = "";
+
+  let inSum = 0;
+  let outSum = 0;
+
+  filtered.forEach(m => {
+    if (m.type === "IN") inSum += m.quantity || 0;
+    if (m.type === "OUT") outSum += m.quantity || 0;
+
+    const div = document.createElement("div");
+    div.className = "item";
+
+    div.innerHTML = `
+      <div>
+        <b>${m.reason}</b>
+        <div class="badge">${m.type}</div>
+      </div>
+      <div>${m.quantity}</div>
+    `;
+
+    list.appendChild(div);
+  });
+
+  summary.innerHTML = `
+    IN: <b>${inSum}</b> | OUT: <b>${outSum}</b> | TOTAL MOVEMENTS: <b>${filtered.length}</b>
+  `;
+}
+
+/* =========================
+   EXPORT CSV
+========================= */
+document.getElementById("exportBtn").onclick = () => {
+  let csv = "Type,Reason,Quantity,Date\n";
+
+  filtered.forEach(m => {
+    csv += `${m.type},${m.reason},${m.quantity},${m.createdAt?.toDate?.()}\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "movements.csv";
+  a.click();
+};
+</script>
+
+</body>
+</html>
