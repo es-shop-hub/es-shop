@@ -1,4 +1,4 @@
-// purchases.js - VERSION FINALE PRO  (+ filtre côté client bon à <300 produits)
+// purchases.js - VERSION FINALE PRO v2  (+ filtre côté client bon à <300 produits)
 import { 
   db, collection, addDoc, getDocs, doc, updateDoc, query, where, serverTimestamp, getDoc 
 } from './firebase.js';
@@ -258,24 +258,31 @@ function renderStock(list) {
 // --- MANUAL UPDATE ---
 window.manualUpdate = async (productId) => {
   if (!currentUserId) return alert("Non connecté");
+
   const newQty = parseInt(prompt("Nouvelle quantité :"));
   if (isNaN(newQty) || newQty < 0) return;
 
   try {
     await checkUser(currentUserId);
+
     const prodRef = doc(db, "products", productId);
     const prodSnap = await getDoc(prodRef);
     if (!prodSnap.exists()) return;
 
     const currentStock = prodSnap.data().stock_current || 0;
     const diff = newQty - currentStock;
+
     if (diff === 0) return alert("Aucune modification");
 
+    const now = serverTimestamp();
+
+    // 1. update stock
     await updateDoc(prodRef, {
       stock_current: newQty,
-      updatedAt: serverTimestamp()
+      updatedAt: now
     });
 
+    // 2. stock movement
     await addDoc(stockMovementsCol, {
       productId,
       type: diff > 0 ? "IN" : "OUT",
@@ -283,18 +290,44 @@ window.manualUpdate = async (productId) => {
       reason: "manual_correction",
       referenceId: null,
       createdBy: currentUserId,
-      createdAt: serverTimestamp()
+      createdAt: now
     });
 
+    // 3. PURCHASE (corrigé)
+    const purchaseRef = await addDoc(purchasesCol, {
+      supplier: "manual",
+      total_cost: Math.abs(diff) * prodSnap.data().price_buy,
+      createdAt: now
+    });
+
+    // 4. PURCHASE ITEM (corrigé)
+    await addDoc(purchaseItemsCol, {
+      purchaseId: purchaseRef.id,
+      productId,
+      quantity: Math.abs(diff),
+      price: prodSnap.data().price_buy
+    });
+
+    // 5. EXPENSE
+    await addDoc(collection(db, "expenses"), {
+      type: "manual_purchase",
+      amount: Math.abs(diff) * prodSnap.data().price_buy,
+      relatedPurchaseId: purchaseRef.id,
+      createdAt: now,
+      createdBy: currentUserId
+    });
+
+    // 6. LOG
     await addDoc(logsCol, {
       userId: currentUserId,
       action: "manual_stock_update",
       targetId: productId,
       details: { oldQty: currentStock, newQty },
-      createdAt: serverTimestamp()
+      createdAt: now
     });
 
     loadStock();
+
   } catch (e) {
     console.error(e);
     alert(e.message);
