@@ -110,68 +110,117 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 
 const auth = getAuth();
 
+/* ================= STATE ================= */
 let data = {
   sales: [],
   expenses: [],
   stock: []
 };
 
+/* ================= SAFE DATE ================= */
 function toDate(t){
-  return t?.toDate ? t.toDate() : new Date(t);
+  if (!t) return null;
+
+  if (t?.toDate) return t.toDate();
+
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
 }
+
+/* ================= SAFE NUMBER ================= */
+const n = (v) => {
+  const num = Number(v);
+  return isNaN(num) ? 0 : num;
+};
 
 /* ================= AUTH ================= */
 onAuthStateChanged(auth, async (user)=>{
   if(!user) return location.href="login.html";
 
   await load();
+  applyDefault7Days(); // 🔥 IMPORTANT
 });
 
 /* ================= LOAD ================= */
 async function load(){
-  const [salesSnap, expSnap, stockSnap] = await Promise.all([
-    getDocs(query(collection(db,"sales"), orderBy("createdAt","desc"))),
-    getDocs(query(collection(db,"expenses"), orderBy("createdAt","desc"))),
-    getDocs(query(collection(db,"stock_movements"), orderBy("createdAt","desc")))
-  ]);
+  try {
+    const [salesSnap, expSnap, stockSnap] = await Promise.all([
+      getDocs(query(collection(db,"sales"), orderBy("createdAt","desc"))),
+      getDocs(query(collection(db,"expenses"), orderBy("createdAt","desc"))),
+      getDocs(query(collection(db,"stock_movements"), orderBy("createdAt","desc")))
+    ]);
 
-  data.sales = salesSnap.docs.map(d=>d.data());
-  data.expenses = expSnap.docs.map(d=>d.data());
-  data.stock = stockSnap.docs.map(d=>d.data());
+    data.sales = salesSnap.docs.map(d => d.data());
+    data.expenses = expSnap.docs.map(d => d.data());
+    data.stock = stockSnap.docs.map(d => d.data());
 
-  render();
+    console.log("DATA LOADED:", data); // 🔥 debug utile
+
+    render();
+  } catch (err) {
+    console.error("LOAD ERROR:", err);
+  }
 }
 
 /* ================= FILTER ================= */
 function filterRange(list, start, end){
-  return list.filter(i=>{
+  const startDate = start ? new Date(start) : null;
+  const endDate = end ? new Date(end) : null;
+
+  return list.filter(i => {
     const d = toDate(i.createdAt);
-    if(start && d < new Date(start)) return false;
-    if(end && d > new Date(end)) return false;
+    if (!d) return false;
+
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+
     return true;
   });
 }
 
+/* ================= DEFAULT 7 DAYS ================= */
+function applyDefault7Days(){
+  const now = new Date();
+  const start = new Date();
+  start.setDate(now.getDate() - 7);
+
+  const startInput = document.getElementById("start");
+  const endInput = document.getElementById("end");
+
+  if (startInput) startInput.valueAsDate = start;
+  if (endInput) endInput.valueAsDate = now;
+
+  render();
+}
+
 /* ================= RENDER ================= */
 function render(){
-  const start = document.getElementById("start").value;
-  const end = document.getElementById("end").value;
+  const start = document.getElementById("start")?.value;
+  const end = document.getElementById("end")?.value;
 
-  const sales = filterRange(data.sales,start,end);
-  const expenses = filterRange(data.expenses,start,end);
-  const stock = filterRange(data.stock,start,end);
+  const sales = filterRange(data.sales, start, end);
+  const expenses = filterRange(data.expenses, start, end);
+  const stock = filterRange(data.stock, start, end);
 
-  const totalSales = sales.reduce((a,s)=>a+(s.total_amount||0),0);
-  const profit = sales.reduce((a,s)=>a+(s.total_profit||0),0);
-  const exp = expenses.reduce((a,e)=>a+(e.amount||0),0);
+  /* ================= CALCULS ================= */
 
-  const inStock = stock.filter(s=>s.type==="IN").reduce((a,s)=>a+(s.quantity||0),0);
-  const outStock = stock.filter(s=>s.type==="OUT").reduce((a,s)=>a+(s.quantity||0),0);
+  const totalSales = sales.reduce((a,s)=>a + n(s.total_amount),0);
+  const profit = sales.reduce((a,s)=>a + n(s.total_profit),0);
+  const exp = expenses.reduce((a,e)=>a + n(e.amount),0);
+
+  const inStock = stock
+    .filter(s => s.type === "IN")
+    .reduce((a,s)=>a + n(s.quantity),0);
+
+  const outStock = stock
+    .filter(s => s.type === "OUT")
+    .reduce((a,s)=>a + n(s.quantity),0);
 
   const soldQty = sales.length;
 
+  /* ================= UI ================= */
   document.getElementById("sales").textContent = totalSales + " FC";
-  document.getElementById("profit").textContent = (profit-exp) + " FC";
+  document.getElementById("profit").textContent = (profit - exp) + " FC";
   document.getElementById("expenses").textContent = exp + " FC";
 
   document.getElementById("sold").textContent = soldQty;
@@ -182,23 +231,30 @@ function render(){
 /* ================= EVENTS ================= */
 document.getElementById("apply").onclick = render;
 
-document.getElementById("export").onclick = ()=>{
-  const csv = [
-    "Type,Value",
-    `Sales,${document.getElementById("sales").textContent}`,
-    `Profit,${document.getElementById("profit").textContent}`,
-    `Expenses,${document.getElementById("expenses").textContent}`
-  ].join("\n");
+/* ================= EXPORT CSV ================= */
+document.getElementById("export").onclick = () => {
+  const rows = [
+    ["Type","Value"],
+    ["Sales", document.getElementById("sales").textContent],
+    ["Profit", document.getElementById("profit").textContent],
+    ["Expenses", document.getElementById("expenses").textContent],
+    ["Sold Qty", document.getElementById("sold").textContent],
+    ["Stock IN", document.getElementById("in").textContent],
+    ["Stock OUT", document.getElementById("out").textContent]
+  ];
 
-  const blob = new Blob([csv],{type:"text/csv"});
+  const csv = rows.map(r => r.join(",")).join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
   a.href = url;
   a.download = "es-shop-stats.csv";
   a.click();
+
+  URL.revokeObjectURL(url);
 };
 </script>
-
 </body>
 </html>
