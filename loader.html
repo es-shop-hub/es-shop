@@ -99,7 +99,8 @@ button{
     <div class="big" id="in">0</div>
   </div>
 </div>
-  <script type="module">
+
+<script type="module">
 import { db } from "./js/firebase.js";
 import {
   collection, getDocs, query, orderBy
@@ -116,30 +117,27 @@ let data = {
   stock: []
 };
 
-/* ================= SAFE HELPERS ================= */
+/* ================= HELPERS ================= */
+const el = (id) => document.getElementById(id);
 
-// Date safe (Firestore / string / null)
-function toDate(t){
-  if (!t) return null;
-
-  try {
-    if (typeof t.toDate === "function") return t.toDate();
-
-    const d = new Date(t);
-    return isNaN(d.getTime()) ? null : d;
-  } catch {
-    return null;
-  }
-}
-
-// Number safe
 const n = (v) => {
   const num = Number(v);
   return isNaN(num) ? 0 : num;
 };
 
-// Safe DOM
-const el = (id) => document.getElementById(id);
+function safeGet(obj, keys, fallback = 0) {
+  for (const k of keys) {
+    if (obj?.[k] !== undefined && obj?.[k] !== null) return obj[k];
+  }
+  return fallback;
+}
+
+function toDate(t){
+  if (!t) return null;
+  if (typeof t?.toDate === "function") return t.toDate();
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 /* ================= AUTH ================= */
 onAuthStateChanged(auth, async (user)=>{
@@ -162,7 +160,7 @@ async function load(){
     data.expenses = expSnap.docs.map(d => d.data() || {});
     data.stock = stockSnap.docs.map(d => d.data() || {});
 
-    console.log("LOAD OK:", {
+    console.log("DATA LOADED:", {
       sales: data.sales.length,
       expenses: data.expenses.length,
       stock: data.stock.length
@@ -175,7 +173,7 @@ async function load(){
   }
 }
 
-/* ================= FILTER SAFE ================= */
+/* ================= FILTER ================= */
 function filterRange(list, start, end){
   if (!Array.isArray(list)) return [];
 
@@ -184,9 +182,6 @@ function filterRange(list, start, end){
 
   return list.filter(item => {
     const d = toDate(item.createdAt);
-
-    // 🔥 IMPORTANT: si pas de date → on garde PAS pour stats temporelles
-    // MAIS on évite crash
     if (!d) return false;
 
     if (startDate && d < startDate) return false;
@@ -196,22 +191,19 @@ function filterRange(list, start, end){
   });
 }
 
-/* ================= DEFAULT RANGE ================= */
+/* ================= DEFAULT 7 DAYS ================= */
 function applyDefault7Days(){
   const now = new Date();
   const start = new Date();
   start.setDate(now.getDate() - 7);
 
-  const startEl = el("start");
-  const endEl = el("end");
-
-  if (startEl) startEl.valueAsDate = start;
-  if (endEl) endEl.valueAsDate = now;
+  el("start").valueAsDate = start;
+  el("end").valueAsDate = now;
 
   render();
 }
 
-/* ================= CORE RENDER ================= */
+/* ================= RENDER ================= */
 function render(){
   const start = el("start")?.value || null;
   const end = el("end")?.value || null;
@@ -226,21 +218,29 @@ function render(){
     stock: stock.length
   });
 
-  /* ================= CALCULS SAFE ================= */
+  /* ================= CALCULS ================= */
 
-  const totalSales = sales.reduce((a,s)=> a + n(s?.total_amount), 0);
-  const profit = sales.reduce((a,s)=> a + n(s?.total_profit), 0);
-  const exp = expenses.reduce((a,e)=> a + n(e?.amount), 0);
+  const totalSales = sales.reduce((a,s)=>
+    a + n(safeGet(s, ["total_amount","amount_total","amount"]))
+  ,0);
+
+  const profit = sales.reduce((a,s)=>
+    a + n(safeGet(s, ["total_profit","profit"]))
+  ,0);
+
+  const exp = expenses.reduce((a,e)=>
+    a + n(e?.amount)
+  ,0);
 
   const inStock = stock
     .filter(s => s?.type === "IN")
-    .reduce((a,s)=> a + n(s?.quantity), 0);
+    .reduce((a,s)=> a + n(s?.quantity),0);
 
   const outStock = stock
     .filter(s => s?.type === "OUT")
-    .reduce((a,s)=> a + n(s?.quantity), 0);
+    .reduce((a,s)=> a + n(s?.quantity),0);
 
-  /* ================= UI SAFE ================= */
+  /* ================= UI ================= */
 
   setText("sales", totalSales + " FC");
   setText("profit", (profit - exp) + " FC");
@@ -251,42 +251,38 @@ function render(){
   setText("out", outStock);
 }
 
-/* ================= SAFE UI SETTER ================= */
+/* ================= UI SAFE ================= */
 function setText(id, value){
   const node = el(id);
   if (node) node.textContent = value ?? "0";
 }
 
 /* ================= EVENTS ================= */
-const applyBtn = el("apply");
-if (applyBtn) applyBtn.onclick = render;
+el("apply").onclick = render;
 
-/* ================= EXPORT CSV ================= */
-const exportBtn = el("export");
+/* ================= EXPORT ================= */
+el("export").onclick = () => {
+  const csv = [
+    "Metric,Value",
+    `Sales,${el("sales")?.textContent || 0}`,
+    `Profit,${el("profit")?.textContent || 0}`,
+    `Expenses,${el("expenses")?.textContent || 0}`,
+    `Sold,${el("sold")?.textContent || 0}`,
+    `IN,${el("in")?.textContent || 0}`,
+    `OUT,${el("out")?.textContent || 0}`
+  ].join("\n");
 
-if (exportBtn) {
-  exportBtn.onclick = () => {
-    const csv = [
-      "Metric,Value",
-      `Sales,${el("sales")?.textContent || 0}`,
-      `Profit,${el("profit")?.textContent || 0}`,
-      `Expenses,${el("expenses")?.textContent || 0}`,
-      `Sold,${el("sold")?.textContent || 0}`,
-      `IN,${el("in")?.textContent || 0}`,
-      `OUT,${el("out")?.textContent || 0}`
-    ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
 
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "es-shop-stats.csv";
+  a.click();
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "es-shop-stats.csv";
-    a.click();
+  URL.revokeObjectURL(url);
+};
+</script>
 
-    URL.revokeObjectURL(url);
-  };
-}
-  </script>
 </body>
 </html>
