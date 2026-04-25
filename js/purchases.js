@@ -167,14 +167,7 @@ if (selectedProductId === "new") {
     // --- RECALCUL STOCK ---
     await recalcStock(productId);
     
-    //--- EXPENSES
-    await addDoc(collection(db, "expenses"), {
-      type: "purchase",
-      amount: quantity * unitPrice,
-      relatedPurchaseId: purchaseRef.id,
-      createdAt: now,
-      createdBy: currentUserId
-});
+    //--- EXPENSE supprimé 
 
     // --- LOG ---
     await addDoc(logsCol, {
