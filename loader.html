@@ -13,28 +13,30 @@ body{
   padding:20px;
 }
 
-h2{margin-bottom:15px;}
+h2{margin-bottom:10px;}
 
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+/* MODE SWITCH */
+.mode{
+  display:flex;
   gap:10px;
+  margin-bottom:15px;
 }
 
-.card{
+.mode button{
+  padding:10px 15px;
+  border-radius:6px;
+  border:1px solid #ddd;
+  cursor:pointer;
   background:white;
-  padding:15px;
-  border-radius:10px;
-  box-shadow:0 2px 6px rgba(0,0,0,0.05);
 }
 
-.big{
-  font-size:22px;
-  font-weight:bold;
+.mode button.active{
+  background:#0B5FFF;
+  color:white;
+  border:none;
 }
 
-small{color:#666}
-
+/* FILTERS */
 .filters{
   margin-bottom:15px;
   display:flex;
@@ -54,6 +56,27 @@ button{
   border:none;
   cursor:pointer;
 }
+
+/* GRID */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:10px;
+}
+
+.card{
+  background:white;
+  padding:15px;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
+}
+
+.big{
+  font-size:22px;
+  font-weight:bold;
+}
+
+small{color:#666}
 </style>
 </head>
 
@@ -61,13 +84,20 @@ button{
 
 <h2>📊 Es-Shop Business Overview</h2>
 
-<div class="filters">
-  <input type="date" id="start">
-  <input type="date" id="end">
-  <button id="apply">Filtrer</button>
-  <button id="export">Export CSV</button>
+<!-- MODE SWITCH -->
+<div class="mode">
+  <button id="modeGlobal" class="active">📊 Global</button>
+  <button id="modeFilter">📅 Filtre</button>
 </div>
 
+<!-- FILTERS -->
+<div class="filters" id="filtersBox">
+  <input type="date" id="start">
+  <input type="date" id="end">
+  <button id="apply">Appliquer</button>
+</div>
+
+<!-- DASHBOARD -->
 <div class="grid">
   <div class="card">
     <small>💰 Chiffre d'affaires</small>
@@ -103,7 +133,7 @@ button{
 <script type="module">
 import { db } from "./js/firebase.js";
 import {
-  collection, getDocs, query, orderBy
+  collection, getDocs, query
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
@@ -111,6 +141,8 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 const auth = getAuth();
 
 /* ================= STATE ================= */
+let mode = "global";
+
 let data = {
   sales: [],
   expenses: [],
@@ -118,176 +150,99 @@ let data = {
 };
 
 /* ================= HELPERS ================= */
-
-// SAFE GET
-function safeGet(obj, keys, fallback = 0) {
-  for (const k of keys) {
-    if (obj && obj[k] != null) return obj[k];
-  }
-  return fallback;
-}
-
-// DATE SAFE
-function toDate(t){
-  if (!t) return null;
-
-  try {
-    if (typeof t.toDate === "function") return t.toDate();
-    const d = new Date(t);
-    return isNaN(d.getTime()) ? null : d;
-  } catch {
-    return null;
-  }
-}
-
-// NUMBER SAFE
-const n = (v) => isNaN(Number(v)) ? 0 : Number(v);
-
-// DOM SAFE
 const el = (id) => document.getElementById(id);
 
-// SET TEXT SAFE
-function setText(id, value){
-  const node = el(id);
-  if (node) node.textContent = value ?? "0";
+const n = (v) => isNaN(Number(v)) ? 0 : Number(v);
+
+function toDate(t){
+  if (!t) return null;
+  if (typeof t.toDate === "function") return t.toDate();
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 /* ================= AUTH ================= */
 onAuthStateChanged(auth, async (user)=>{
   if(!user) return location.href="login.html";
-
   await load();
-  applyDefault7Days();
+  render();
 });
 
 /* ================= LOAD ================= */
 async function load(){
-  try {
-    const [salesSnap, expSnap, stockSnap] = await Promise.all([
-      getDocs(query(collection(db,"sales"), orderBy("createdAt","desc"))),
-      getDocs(query(collection(db,"expenses"), orderBy("createdAt","desc"))),
-      getDocs(query(collection(db,"stock_movements"), orderBy("createdAt","desc")))
-    ]);
+  const [salesSnap, expSnap, stockSnap] = await Promise.all([
+    getDocs(collection(db,"sales")),
+    getDocs(collection(db,"expenses")),
+    getDocs(collection(db,"stock_movements"))
+  ]);
 
-    data.sales = salesSnap.docs.map(d => d.data() || {});
-    data.expenses = expSnap.docs.map(d => d.data() || {});
-    data.stock = stockSnap.docs.map(d => d.data() || {});
-
-    console.log("DATA:", data);
-
-    render();
-
-  } catch (err) {
-    console.error("LOAD ERROR:", err);
-  }
+  data.sales = salesSnap.docs.map(d => d.data() || {});
+  data.expenses = expSnap.docs.map(d => d.data() || {});
+  data.stock = stockSnap.docs.map(d => d.data() || {});
 }
 
 /* ================= FILTER ================= */
-function filterRange(list, start, end){
-  if (!Array.isArray(list)) return [];
+function filterByDate(list){
+  if(mode === "global") return list;
+
+  const start = el("start")?.value;
+  const end = el("end")?.value;
+
+  if(!start && !end) return list;
 
   const startDate = start ? new Date(start) : null;
   const endDate = end ? new Date(end) : null;
 
-  const filtered = list.filter(item => {
+  return list.filter(item=>{
     const d = toDate(item.createdAt);
+    if(!d) return false;
 
-    if (!d) return false;
-    if (startDate && d < startDate) return false;
-    if (endDate && d > endDate) return false;
+    if(startDate && d < startDate) return false;
+    if(endDate && d > endDate) return false;
 
     return true;
   });
-
-  // 🔥 FALLBACK : si rien → on prend tout
-  return filtered.length ? filtered : list;
-}
-
-/* ================= DEFAULT ================= */
-function applyDefault7Days(){
-  const now = new Date();
-  const start = new Date();
-  start.setDate(now.getDate() - 7);
-
-  el("start").valueAsDate = start;
-  el("end").valueAsDate = now;
-
-  render();
 }
 
 /* ================= RENDER ================= */
 function render(){
-  const start = el("start")?.value || null;
-  const end = el("end")?.value || null;
 
-  const sales = filterRange(data.sales, start, end);
-  const expenses = filterRange(data.expenses, start, end);
-  const stock = filterRange(data.stock, start, end);
+  const sales = filterByDate(data.sales);
+  const expenses = filterByDate(data.expenses);
+  const stock = filterByDate(data.stock);
 
-  console.log("FILTERED:", {
-    sales: sales.length,
-    expenses: expenses.length,
-    stock: stock.length
-  });
+  const totalSales = sales.reduce((a,s)=>a+n(s.total_amount),0);
+  const profit = sales.reduce((a,s)=>a+n(s.total_profit),0);
+  const exp = expenses.reduce((a,e)=>a+n(e.amount),0);
 
-  /* ================= CALCULS ================= */
+  const inStock = stock.filter(s=>s.type==="IN").reduce((a,s)=>a+n(s.quantity),0);
+  const outStock = stock.filter(s=>s.type==="OUT").reduce((a,s)=>a+n(s.quantity),0);
 
-  const totalSales = sales.reduce((a,s)=> 
-    a + n(safeGet(s, ["total_amount", "amount_total", "amount"]))
-  ,0);
-
-  const profit = sales.reduce((a,s)=> 
-    a + n(safeGet(s, ["total_profit", "profit"]))
-  ,0);
-
-  const exp = expenses.reduce((a,e)=> 
-    a + n(safeGet(e, ["amount"]))
-  ,0);
-
-  const inStock = stock
-    .filter(s => s?.type === "IN")
-    .reduce((a,s)=> a + n(s?.quantity), 0);
-
-  const outStock = stock
-    .filter(s => s?.type === "OUT")
-    .reduce((a,s)=> a + n(s?.quantity), 0);
-
-  /* ================= UI ================= */
-
-  setText("sales", totalSales + " FC");
-  setText("profit", (profit - exp) + " FC");
-  setText("expenses", exp + " FC");
-
-  setText("sold", sales.length);
-  setText("in", inStock);
-  setText("out", outStock);
+  el("sales").textContent = totalSales+" FC";
+  el("profit").textContent = (profit-exp)+" FC";
+  el("expenses").textContent = exp+" FC";
+  el("sold").textContent = sales.length;
+  el("in").textContent = inStock;
+  el("out").textContent = outStock;
 }
 
 /* ================= EVENTS ================= */
-el("apply")?.addEventListener("click", render);
+el("modeGlobal").onclick = ()=>{
+  mode="global";
+  el("modeGlobal").classList.add("active");
+  el("modeFilter").classList.remove("active");
+  render();
+};
 
-/* ================= EXPORT ================= */
-el("export")?.addEventListener("click", () => {
-  const csv = [
-    "Metric,Value",
-    `Sales,${el("sales")?.textContent || 0}`,
-    `Profit,${el("profit")?.textContent || 0}`,
-    `Expenses,${el("expenses")?.textContent || 0}`,
-    `Sold,${el("sold")?.textContent || 0}`,
-    `IN,${el("in")?.textContent || 0}`,
-    `OUT,${el("out")?.textContent || 0}`
-  ].join("\n");
+el("modeFilter").onclick = ()=>{
+  mode="filter";
+  el("modeFilter").classList.add("active");
+  el("modeGlobal").classList.remove("active");
+  render();
+};
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "es-shop-stats.csv";
-  a.click();
-
-  URL.revokeObjectURL(url);
-});
+el("apply").onclick = render;
 </script>
+
 </body>
 </html>
