@@ -161,14 +161,11 @@ import { db } from "./js/firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-/* =========================
-   ELEMENTS
-========================= */
 const el = (id) => document.getElementById(id);
 const n = (v) => Number(v) || 0;
 
 /* =========================
-   DEBUG (AUTO HIDE)
+   DEBUG AUTO CLEAN
 ========================= */
 let debugTimer;
 
@@ -176,18 +173,18 @@ function debug(msg) {
   const box = el("debug");
   if (!box) return;
 
-  box.innerText = msg;
+  box.textContent = msg;
 
   clearTimeout(debugTimer);
   debugTimer = setTimeout(() => {
-    box.innerText = "";
-  }, 60000); // 1 minute
+    box.textContent = "";
+  }, 60000);
 }
 
 /* =========================
    STATE
 ========================= */
-let dataReady = false;
+let ready = false;
 
 /* =========================
    AUTH
@@ -223,16 +220,18 @@ async function load() {
 
     render(sales, expenses, stock, products);
 
-    dataReady = true;
+    ready = true;
+    el("pdfBtn").disabled = false;
+
     debug("✅ Dashboard prêt");
 
   } catch (e) {
-    debug("❌ Erreur: " + e.message);
+    debug("❌ " + e.message);
   }
 }
 
 /* =========================
-   RENDER (STABLE)
+   BUSINESS LOGIC FIXED
 ========================= */
 function render(sales, expenses, stock, products) {
 
@@ -248,67 +247,70 @@ function render(sales, expenses, stock, products) {
     a + n(e.amount)
   , 0);
 
-  const stockIn = stock
-    .filter(s => s.type === "IN")
+  /* ✔ STOCK */
+  const stockIn = stock.filter(s => s.type === "IN")
     .reduce((a, s) => a + n(s.quantity), 0);
 
-  const stockOut = stock
-    .filter(s => s.type === "OUT")
+  const stockOut = stock.filter(s => s.type === "OUT")
     .reduce((a, s) => a + n(s.quantity), 0);
 
   const stockTotal = stockIn - stockOut;
 
-  if (el("sales")) el("sales").textContent = totalSales + " FC";
-  if (el("profit")) el("profit").textContent = (totalProfit - totalExpenses) + " FC";
-  if (el("expenses")) el("expenses").textContent = totalExpenses + " FC";
-  if (el("sold")) el("sold").textContent = sales.length;
-  if (el("stockTotal")) el("stockTotal").textContent = stockTotal;
-  if (el("products")) el("products").textContent = products.length;
+  /* =========================
+     CORRECTION BUSINESS LOGIC
+  ========================= */
+
+  const netReal = totalSales - totalExpenses; // ✔ IMPORTANT
+
+  /* UI */
+  el("sales").textContent = totalSales + " FC";
+  el("profit").textContent = totalProfit + " FC"; // brut
+  el("expenses").textContent = totalExpenses + " FC";
+  el("sold").textContent = sales.length;
+  el("stockTotal").textContent = stockTotal;
+  el("products").textContent = products.length;
+
+  debug("✅ OK");
 }
 
 /* =========================
-   PDF (NO ALERT VERSION)
+   PDF FIXED CLEAN
 ========================= */
-const btn = el("pdfBtn");
+el("pdfBtn").disabled = true;
 
-if (btn) {
-  btn.disabled = true;
+el("pdfBtn").addEventListener("click", async () => {
 
-  btn.addEventListener("click", async () => {
+  if (!ready) {
+    debug("⏳ Chargement...");
+    return;
+  }
 
-    if (!dataReady) {
-      debug("⏳ Chargement en cours...");
-      return;
-    }
+  try {
+    const { jsPDF } = window.jspdf;
 
-    try {
-      const { jsPDF } = window.jspdf;
+    const target = document.querySelector(".grid");
 
-      const target = document.querySelector(".grid");
+    const canvas = await html2canvas(target, {
+      scale: 2,
+      useCORS: true
+    });
 
-      const canvas = await html2canvas(target, {
-        scale: 2,
-        useCORS: true
-      });
+    const img = canvas.toDataURL("image/png");
 
-      const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
 
-      const pdf = new jsPDF("p", "mm", "a4");
+    const w = 190;
+    const h = (canvas.height * w) / canvas.width;
 
-      const width = 190;
-      const height = (canvas.height * width) / canvas.width;
+    pdf.addImage(img, "PNG", 10, 10, w, h);
+    pdf.save("es-shop-stats.pdf");
 
-      pdf.addImage(imgData, "PNG", 10, 10, width, height);
+    debug("📄 PDF OK");
 
-      pdf.save("es-shop-stats.pdf");
-
-      debug("📄 PDF généré avec succès");
-
-    } catch (e) {
-      debug("❌ PDF error: " + e.message);
-    }
-  });
-}
+  } catch (e) {
+    debug("❌ PDF: " + e.message);
+  }
+});
 </script>
 
 </body>
