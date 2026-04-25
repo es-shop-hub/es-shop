@@ -133,7 +133,7 @@ small{color:#666}
 <script type="module">
 import { db } from "./js/firebase.js";
 import {
-  collection, getDocs, query
+  collection, getDocs
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
@@ -151,14 +151,22 @@ let data = {
 
 /* ================= HELPERS ================= */
 const el = (id) => document.getElementById(id);
-
 const n = (v) => isNaN(Number(v)) ? 0 : Number(v);
 
-function toDate(t){
+/* ================= DATE NORMALIZER (IMPORTANT) ================= */
+function toDateSafe(t){
   if (!t) return null;
-  if (typeof t.toDate === "function") return t.toDate();
-  const d = new Date(t);
-  return isNaN(d.getTime()) ? null : d;
+
+  try {
+    if (typeof t.toDate === "function") return t.toDate();
+
+    const d = new Date(t);
+    if (!isNaN(d.getTime())) return d;
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /* ================= AUTH ================= */
@@ -181,21 +189,23 @@ async function load(){
   data.stock = stockSnap.docs.map(d => d.data() || {});
 }
 
-/* ================= FILTER ================= */
-function filterByDate(list){
+/* ================= FILTER ENGINE (PRO FIX) ================= */
+function filter(list){
   if(mode === "global") return list;
 
   const start = el("start")?.value;
   const end = el("end")?.value;
 
-  if(!start && !end) return list;
-
   const startDate = start ? new Date(start) : null;
   const endDate = end ? new Date(end) : null;
 
-  return list.filter(item=>{
-    const d = toDate(item.createdAt);
-    if(!d) return false;
+  return list.filter(item => {
+
+    const d = toDateSafe(item.createdAt || item.updatedAt);
+
+    // 🔥 IMPORTANT FIX :
+    // si aucune date → on garde MAIS on ne filtre pas
+    if(!d) return true;
 
     if(startDate && d < startDate) return false;
     if(endDate && d > endDate) return false;
@@ -207,16 +217,21 @@ function filterByDate(list){
 /* ================= RENDER ================= */
 function render(){
 
-  const sales = filterByDate(data.sales);
-  const expenses = filterByDate(data.expenses);
-  const stock = filterByDate(data.stock);
+  const sales = filter(data.sales);
+  const expenses = filter(data.expenses);
+  const stock = filter(data.stock);
 
   const totalSales = sales.reduce((a,s)=>a+n(s.total_amount),0);
   const profit = sales.reduce((a,s)=>a+n(s.total_profit),0);
   const exp = expenses.reduce((a,e)=>a+n(e.amount),0);
 
-  const inStock = stock.filter(s=>s.type==="IN").reduce((a,s)=>a+n(s.quantity),0);
-  const outStock = stock.filter(s=>s.type==="OUT").reduce((a,s)=>a+n(s.quantity),0);
+  const inStock = stock
+    .filter(s=>s.type==="IN")
+    .reduce((a,s)=>a+n(s.quantity),0);
+
+  const outStock = stock
+    .filter(s=>s.type==="OUT")
+    .reduce((a,s)=>a+n(s.quantity),0);
 
   el("sales").textContent = totalSales+" FC";
   el("profit").textContent = (profit-exp)+" FC";
@@ -229,15 +244,11 @@ function render(){
 /* ================= EVENTS ================= */
 el("modeGlobal").onclick = ()=>{
   mode="global";
-  el("modeGlobal").classList.add("active");
-  el("modeFilter").classList.remove("active");
   render();
 };
 
 el("modeFilter").onclick = ()=>{
   mode="filter";
-  el("modeFilter").classList.add("active");
-  el("modeGlobal").classList.remove("active");
   render();
 };
 
