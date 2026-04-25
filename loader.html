@@ -282,8 +282,9 @@ el("pdfBtn").addEventListener("click", async () => {
 
   try {
 
-    const { jsPDF } = await import("https://esm.sh/jspdf@2.5.1");
-
+    import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
+    import html2canvas from "https://esm.sh/html2canvas@1.4.1";
+    
     const target = document.querySelector(".grid");
 
     const canvas = await html2canvas(target, {
