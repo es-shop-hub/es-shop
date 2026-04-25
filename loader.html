@@ -34,6 +34,26 @@ h2{margin-bottom:15px;}
 }
 
 small{color:#666}
+  nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: #111;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 0;
+      color: white;
+      z-index: 1000;
+    }
+    nav div {
+      text-align: center;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    nav div.active {
+      color: #D4AF37;
+      font-weight: bold;
+    }
 </style>
 </head>
 
@@ -75,6 +95,21 @@ small{color:#666}
 
 </div>
 
+  <nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
+  <div class="nav-item active" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+  </nav>
+  
+<script>
+document.querySelectorAll('nav .nav-item').forEach(item => {
+  item.addEventListener('click', () => location.href = item.dataset.page);
+});
+</script>
+  
 <script type="module">
 import { db } from "./js/firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
