@@ -13,51 +13,8 @@ body{
   padding:20px;
 }
 
-h2{margin-bottom:10px;}
+h2{margin-bottom:15px;}
 
-/* MODE SWITCH */
-.mode{
-  display:flex;
-  gap:10px;
-  margin-bottom:15px;
-}
-
-.mode button{
-  padding:10px 15px;
-  border-radius:6px;
-  border:1px solid #ddd;
-  cursor:pointer;
-  background:white;
-}
-
-.mode button.active{
-  background:#0B5FFF;
-  color:white;
-  border:none;
-}
-
-/* FILTERS */
-.filters{
-  margin-bottom:15px;
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-
-input,button{
-  padding:10px;
-  border:1px solid #ddd;
-  border-radius:6px;
-}
-
-button{
-  background:#0B5FFF;
-  color:white;
-  border:none;
-  cursor:pointer;
-}
-
-/* GRID */
 .grid{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
@@ -82,23 +39,10 @@ small{color:#666}
 
 <body>
 
-<h2>📊 Es-Shop Business Overview</h2>
+<h2>📊 Es-Shop Global Dashboard</h2>
 
-<!-- MODE SWITCH -->
-<div class="mode">
-  <button id="modeGlobal" class="active">📊 Global</button>
-  <button id="modeFilter">📅 Filtre</button>
-</div>
-
-<!-- FILTERS -->
-<div class="filters" id="filtersBox">
-  <input type="date" id="start">
-  <input type="date" id="end">
-  <button id="apply">Appliquer</button>
-</div>
-
-<!-- DASHBOARD -->
 <div class="grid">
+
   <div class="card">
     <small>💰 Chiffre d'affaires</small>
     <div class="big" id="sales">0</div>
@@ -120,14 +64,15 @@ small{color:#666}
   </div>
 
   <div class="card">
-    <small>📉 Stock OUT</small>
-    <div class="big" id="out">0</div>
+    <small>📊 Stock total (actuel)</small>
+    <div class="big" id="stockTotal">0</div>
   </div>
 
   <div class="card">
-    <small>📥 Stock IN</small>
-    <div class="big" id="in">0</div>
+    <small>📦 Nombre de produits</small>
+    <div class="big" id="products">0</div>
   </div>
+
 </div>
 
 <script type="module">
@@ -137,111 +82,94 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 
 const auth = getAuth();
 
-let mode = "global";
+/* ========= SAFE HELPERS ========= */
+const el = (id)=>document.getElementById(id);
 
-let data = {
-  sales: [],
-  expenses: [],
-  stock: []
+const n = (v)=>{
+  const num = Number(v);
+  return isNaN(num) ? 0 : num;
 };
 
-const el = (id) => document.getElementById(id);
-const n = (v) => isNaN(Number(v)) ? 0 : Number(v);
-
-/* ================= DATE SAFE ================= */
-function toDate(t){
-  if (!t) return null;
-
-  if (typeof t.toDate === "function") return t.toDate();
-
-  const d = new Date(t);
-  return isNaN(d.getTime()) ? null : d;
+function safe(obj, keys){
+  for(const k of keys){
+    if(obj && obj[k] != null) return obj[k];
+  }
+  return 0;
 }
 
-/* ================= AUTH ================= */
-onAuthStateChanged(auth, async (user)=>{
+/* ========= AUTH ========= */
+onAuthStateChanged(auth, async(user)=>{
   if(!user) return location.href="login.html";
-  await load();
-  render();
+  load();
 });
 
-/* ================= LOAD ================= */
+/* ========= LOAD ========= */
 async function load(){
-  const [salesSnap, expSnap, stockSnap] = await Promise.all([
-    getDocs(collection(db,"sales")),
-    getDocs(collection(db,"expenses")),
-    getDocs(collection(db,"stock_movements"))
-  ]);
 
-  data.sales = salesSnap.docs.map(d => d.data());
-  data.expenses = expSnap.docs.map(d => d.data());
-  data.stock = stockSnap.docs.map(d => d.data());
+  try{
+
+    const [salesSnap, expSnap, stockSnap, prodSnap] = await Promise.all([
+      getDocs(collection(db,"sales")),
+      getDocs(collection(db,"expenses")),
+      getDocs(collection(db,"stock_movements")),
+      getDocs(collection(db,"products"))
+    ]);
+
+    const sales = salesSnap.docs.map(d=>d.data()||{});
+    const expenses = expSnap.docs.map(d=>d.data()||{});
+    const stock = stockSnap.docs.map(d=>d.data()||{});
+    const products = prodSnap.docs.map(d=>d.data()||{});
+
+    render(sales, expenses, stock, products);
+
+  }catch(e){
+    console.error("LOAD ERROR:", e);
+  }
 }
 
-/* ================= FILTER SAFE ================= */
-function filter(list){
+/* ========= RENDER ========= */
+function render(sales, expenses, stock, products){
 
-  // 🔥 GLOBAL MODE = NO FILTER
-  if(mode === "global") return list;
+  /* ===== SALES ===== */
+  const totalSales = sales.reduce((a,s)=>
+    a + n(safe(s,["total_amount","amount","amount_total"]))
+  ,0);
 
-  const start = el("start")?.value;
-  const end = el("end")?.value;
+  const totalProfit = sales.reduce((a,s)=>
+    a + n(safe(s,["total_profit","profit"]))
+  ,0);
 
-  if(!start && !end) return list;
+  const soldCount = sales.length;
 
-  const startDate = start ? new Date(start) : null;
-  const endDate = end ? new Date(end) : null;
+  /* ===== EXPENSES ===== */
+  const totalExpenses = expenses.reduce((a,e)=>
+    a + n(e.amount)
+  ,0);
 
-  return list.filter(item => {
+  /* ===== STOCK GLOBAL ===== */
+  const stockIn = stock
+    .filter(s=>s.type==="IN")
+    .reduce((a,s)=>a+n(s.quantity),0);
 
-    const d = toDate(item.createdAt);
+  const stockOut = stock
+    .filter(s=>s.type==="OUT")
+    .reduce((a,s)=>a+n(s.quantity),0);
 
-    // 🔥 IMPORTANT FIX :
-    // si pas de date → ON GARDE (sinon tu perds des données historiques)
-    if(!d) return true;
+  const stockTotal = stockIn - stockOut;
 
-    if(startDate && d < startDate) return false;
-    if(endDate && d > endDate) return false;
+  /* ===== PRODUCTS ===== */
+  const productCount = products.length;
 
-    return true;
-  });
-}
-
-/* ================= RENDER ================= */
-function render(){
-
-  const sales = filter(data.sales);
-  const expenses = filter(data.expenses);
-  const stock = filter(data.stock);
-
-  const totalSales = sales.reduce((a,s)=>a+n(s.total_amount),0);
-  const profit = sales.reduce((a,s)=>a+n(s.total_profit),0);
-  const exp = expenses.reduce((a,e)=>a+n(e.amount),0);
-
-  const inStock = stock.filter(s=>s.type==="IN").reduce((a,s)=>a+n(s.quantity),0);
-  const outStock = stock.filter(s=>s.type==="OUT").reduce((a,s)=>a+n(s.quantity),0);
-
+  /* ===== UI ===== */
   el("sales").textContent = totalSales + " FC";
-  el("profit").textContent = (profit - exp) + " FC";
-  el("expenses").textContent = exp + " FC";
-  el("sold").textContent = sales.length;
-  el("in").textContent = inStock;
-  el("out").textContent = outStock;
+  el("profit").textContent = (totalProfit - totalExpenses) + " FC";
+  el("expenses").textContent = totalExpenses + " FC";
+  el("sold").textContent = soldCount;
+  el("stockTotal").textContent = stockTotal;
+  el("products").textContent = productCount;
 }
-
-/* ================= EVENTS ================= */
-el("modeGlobal").onclick = ()=>{
-  mode = "global";
-  render();
-};
-
-el("modeFilter").onclick = ()=>{
-  mode = "filter";
-  render();
-};
-
-el("apply").onclick = render;
 
 </script>
+
 </body>
 </html>
