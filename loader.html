@@ -108,6 +108,11 @@ html, body{
 <div id="debug" style="margin-bottom:10px;color:red;font-size:13px;"></div>
 <div class="grid">
 
+    <div class="card">
+  <small>📦 Valeur du stock</small>
+  <div class="big" id="stockValue">0</div>
+</div>
+
   <div class="card">
     <small>💰 Chiffre d'affaires</small>
     <div class="big" id="sales">0</div>
@@ -160,9 +165,10 @@ document.querySelectorAll('nav .nav-item').forEach(item => {
 import { db } from "./js/firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
 import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
-  
+
 const el = (id) => document.getElementById(id);
 const n = (v) => Number(v) || 0;
 
@@ -238,6 +244,12 @@ async function load() {
 ========================= */
 function render(sales, expenses, stock, products) {
 
+    const stockValue = products.reduce((total, p) => {
+  const price = n(p.price || p.selling_price || 0);
+  const stock = n(p.stock || 0);
+  return total + (price * stock);
+}, 0);
+
   const totalSales = sales.reduce((a, s) =>
     a + n(s.total_amount || s.amount || s.amount_total)
   , 0);
@@ -259,7 +271,8 @@ function render(sales, expenses, stock, products) {
   const stockTotal = stockIn - stockOut;
 
   const netReal = totalSales - totalExpenses;
-
+  
+  el("stockValue").textContent = stockValue + " FC";
   el("sales").textContent = totalSales + " FC";
   el("profit").textContent = netReal + " FC"; // ✔ corrigé logique réelle
   el("expenses").textContent = totalExpenses + " FC";
