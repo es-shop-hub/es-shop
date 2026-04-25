@@ -40,7 +40,7 @@ small{color:#666}
 <body>
 
 <h2>📊 Es-Shop Global Dashboard</h2>
-
+<div id="debug" style="margin-bottom:10px;color:red;font-size:13px;"></div>
 <div class="grid">
 
   <div class="card">
@@ -80,9 +80,10 @@ import { db } from "./js/firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-const auth = getAuth();
+const debug = (msg) => {
+  document.getElementById("debug").innerText = msg;
+};
 
-/* ========= SAFE HELPERS ========= */
 const el = (id)=>document.getElementById(id);
 
 const n = (v)=>{
@@ -97,15 +98,25 @@ function safe(obj, keys){
   return 0;
 }
 
+const auth = getAuth();
+
+/* ========= START ========= */
+debug("🔄 Initialisation...");
+
 /* ========= AUTH ========= */
 onAuthStateChanged(auth, async(user)=>{
-  if(!user) return location.href="login.html";
+  if(!user){
+    debug("❌ Non connecté → redirection");
+    location.href="login.html";
+    return;
+  }
+
+  debug("✅ Connecté → chargement data...");
   load();
 });
 
 /* ========= LOAD ========= */
 async function load(){
-
   try{
 
     const [salesSnap, expSnap, stockSnap, prodSnap] = await Promise.all([
@@ -120,17 +131,20 @@ async function load(){
     const stock = stockSnap.docs.map(d=>d.data()||{});
     const products = prodSnap.docs.map(d=>d.data()||{});
 
+    debug(
+      `📊 sales:${sales.length} | expenses:${expenses.length} | stock:${stock.length} | products:${products.length}`
+    );
+
     render(sales, expenses, stock, products);
 
   }catch(e){
-    console.error("LOAD ERROR:", e);
+    debug("🔥 ERREUR LOAD: " + e.message);
   }
 }
 
 /* ========= RENDER ========= */
 function render(sales, expenses, stock, products){
 
-  /* ===== SALES ===== */
   const totalSales = sales.reduce((a,s)=>
     a + n(safe(s,["total_amount","amount","amount_total"]))
   ,0);
@@ -139,14 +153,10 @@ function render(sales, expenses, stock, products){
     a + n(safe(s,["total_profit","profit"]))
   ,0);
 
-  const soldCount = sales.length;
-
-  /* ===== EXPENSES ===== */
   const totalExpenses = expenses.reduce((a,e)=>
     a + n(e.amount)
   ,0);
 
-  /* ===== STOCK GLOBAL ===== */
   const stockIn = stock
     .filter(s=>s.type==="IN")
     .reduce((a,s)=>a+n(s.quantity),0);
@@ -157,19 +167,15 @@ function render(sales, expenses, stock, products){
 
   const stockTotal = stockIn - stockOut;
 
-  /* ===== PRODUCTS ===== */
-  const productCount = products.length;
-
-  /* ===== UI ===== */
   el("sales").textContent = totalSales + " FC";
   el("profit").textContent = (totalProfit - totalExpenses) + " FC";
   el("expenses").textContent = totalExpenses + " FC";
-  el("sold").textContent = soldCount;
+  el("sold").textContent = sales.length;
   el("stockTotal").textContent = stockTotal;
-  el("products").textContent = productCount;
+  el("products").textContent = products.length;
+
+  debug("✅ Render OK");
 }
-
 </script>
-
 </body>
 </html>
