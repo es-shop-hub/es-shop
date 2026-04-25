@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+/<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -160,7 +160,9 @@ document.querySelectorAll('nav .nav-item').forEach(item => {
 import { db } from "./js/firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-
+import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
+import html2canvas from "https://esm.sh/html2canvas@1.4.1";
+  
 const el = (id) => document.getElementById(id);
 const n = (v) => Number(v) || 0;
 
@@ -282,9 +284,6 @@ el("pdfBtn").addEventListener("click", async () => {
 
   try {
 
-    import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
-    import html2canvas from "https://esm.sh/html2canvas@1.4.1";
-    
     const target = document.querySelector(".grid");
 
     const canvas = await html2canvas(target, {
