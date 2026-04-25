@@ -155,165 +155,161 @@ document.querySelectorAll('nav .nav-item').forEach(item => {
 });
 
 </script>
-<!-- LIB PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script type="module">
 import { db } from "./js/firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-const debug = (msg) => {
-  document.getElementById("debug").innerText = msg;
-};
+/* =========================
+   ELEMENTS
+========================= */
+const el = (id) => document.getElementById(id);
+const n = (v) => Number(v) || 0;
 
-const el = (id)=>document.getElementById(id);
+/* =========================
+   DEBUG (AUTO HIDE)
+========================= */
+let debugTimer;
 
-const n = (v)=>{
-  const num = Number(v);
-  return isNaN(num) ? 0 : num;
-};
+function debug(msg) {
+  const box = el("debug");
+  if (!box) return;
 
-function safe(obj, keys){
-  for(const k of keys){
-    if(obj && obj[k] != null) return obj[k];
-  }
-  return 0;
+  box.innerText = msg;
+
+  clearTimeout(debugTimer);
+  debugTimer = setTimeout(() => {
+    box.innerText = "";
+  }, 60000); // 1 minute
 }
 
+/* =========================
+   STATE
+========================= */
+let dataReady = false;
+
+/* =========================
+   AUTH
+========================= */
 const auth = getAuth();
 
-/* ========= START ========= */
-debug("🔄 Initialisation...");
-
-/* ========= AUTH ========= */
-onAuthStateChanged(auth, async(user)=>{
-  if(!user){
-    debug("❌ Non connecté → redirection");
-    location.href="login.html";
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    location.href = "login.html";
     return;
   }
 
-  debug("✅ Connecté → chargement data...");
-  load();
+  debug("🔄 Chargement...");
+  await load();
 });
 
-/* ========= LOAD ========= */
-async function load(){
-  try{
-
+/* =========================
+   LOAD DATA
+========================= */
+async function load() {
+  try {
     const [salesSnap, expSnap, stockSnap, prodSnap] = await Promise.all([
-      getDocs(collection(db,"sales")),
-      getDocs(collection(db,"expenses")),
-      getDocs(collection(db,"stock_movements")),
-      getDocs(collection(db,"products"))
+      getDocs(collection(db, "sales")),
+      getDocs(collection(db, "expenses")),
+      getDocs(collection(db, "stock_movements")),
+      getDocs(collection(db, "products"))
     ]);
 
-    const sales = salesSnap.docs.map(d=>d.data()||{});
-    const expenses = expSnap.docs.map(d=>d.data()||{});
-    const stock = stockSnap.docs.map(d=>d.data()||{});
-    const products = prodSnap.docs.map(d=>d.data()||{});
-
-    debug(
-      `📊 sales:${sales.length} | expenses:${expenses.length} | stock:${stock.length} | products:${products.length}`
-    );
+    const sales = salesSnap.docs.map(d => d.data() || {});
+    const expenses = expSnap.docs.map(d => d.data() || {});
+    const stock = stockSnap.docs.map(d => d.data() || {});
+    const products = prodSnap.docs.map(d => d.data() || {});
 
     render(sales, expenses, stock, products);
 
-  }catch(e){
-    debug("🔥 ERREUR LOAD: " + e.message);
+    dataReady = true;
+    debug("✅ Dashboard prêt");
+
+  } catch (e) {
+    debug("❌ Erreur: " + e.message);
   }
 }
 
-/* ========= RENDER ========= */
-function render(sales, expenses, stock, products){
+/* =========================
+   RENDER (STABLE)
+========================= */
+function render(sales, expenses, stock, products) {
 
-  const totalSales = sales.reduce((a,s)=>
-    a + n(safe(s,["total_amount","amount","amount_total"]))
-  ,0);
+  const totalSales = sales.reduce((a, s) =>
+    a + n(s.total_amount || s.amount || s.amount_total)
+  , 0);
 
-  const totalProfit = sales.reduce((a,s)=>
-    a + n(safe(s,["total_profit","profit"]))
-  ,0);
+  const totalProfit = sales.reduce((a, s) =>
+    a + n(s.total_profit || s.profit)
+  , 0);
 
-  const totalExpenses = expenses.reduce((a,e)=>
+  const totalExpenses = expenses.reduce((a, e) =>
     a + n(e.amount)
-  ,0);
+  , 0);
 
   const stockIn = stock
-    .filter(s=>s.type==="IN")
-    .reduce((a,s)=>a+n(s.quantity),0);
+    .filter(s => s.type === "IN")
+    .reduce((a, s) => a + n(s.quantity), 0);
 
   const stockOut = stock
-    .filter(s=>s.type==="OUT")
-    .reduce((a,s)=>a+n(s.quantity),0);
+    .filter(s => s.type === "OUT")
+    .reduce((a, s) => a + n(s.quantity), 0);
 
   const stockTotal = stockIn - stockOut;
 
-  el("sales").textContent = totalSales + " FC";
-  el("profit").textContent = (totalProfit - totalExpenses) + " FC";
-  el("expenses").textContent = totalExpenses + " FC";
-  el("sold").textContent = sales.length;
-  el("stockTotal").textContent = stockTotal;
-  el("products").textContent = products.length;
-
-  debug("✅ Render OK");
-}
-</script>
-<script>
-let readyForPdf = false;
-
-document.getElementById("pdfBtn").disabled = true;
-
-/* 🔥 ACTIVER PDF APRÈS RENDER */
-function enablePdf(){
-  readyForPdf = true;
-  document.getElementById("pdfBtn").disabled = false;
+  if (el("sales")) el("sales").textContent = totalSales + " FC";
+  if (el("profit")) el("profit").textContent = (totalProfit - totalExpenses) + " FC";
+  if (el("expenses")) el("expenses").textContent = totalExpenses + " FC";
+  if (el("sold")) el("sold").textContent = sales.length;
+  if (el("stockTotal")) el("stockTotal").textContent = stockTotal;
+  if (el("products")) el("products").textContent = products.length;
 }
 
-/* 🔥 MODIF ICI (IMPORTANT) */
-const oldRender = render;
-render = function(...args){
-  oldRender(...args);
-  enablePdf();
-};
+/* =========================
+   PDF (NO ALERT VERSION)
+========================= */
+const btn = el("pdfBtn");
 
-/* 🔥 PDF */
-document.getElementById("pdfBtn").addEventListener("click", async () => {
+if (btn) {
+  btn.disabled = true;
 
-  if(!readyForPdf){
-    alert("⏳ Données en cours de chargement...");
-    return;
-  }
+  btn.addEventListener("click", async () => {
 
-  try{
+    if (!dataReady) {
+      debug("⏳ Chargement en cours...");
+      return;
+    }
 
-    const { jsPDF } = window.jspdf;
+    try {
+      const { jsPDF } = window.jspdf;
 
-    const target = document.querySelector(".grid");
+      const target = document.querySelector(".grid");
 
-    const canvas = await html2canvas(target, {
-      scale: 2,
-      useCORS: true
-    });
+      const canvas = await html2canvas(target, {
+        scale: 2,
+        useCORS: true
+      });
 
-    const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/png");
 
-    const pdf = new jsPDF("p", "mm", "a4");
+      const pdf = new jsPDF("p", "mm", "a4");
 
-    const imgWidth = 190;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const width = 190;
+      const height = (canvas.height * width) / canvas.width;
 
-    pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+      pdf.addImage(imgData, "PNG", 10, 10, width, height);
 
-    pdf.save("es-shop-stats.pdf");
+      pdf.save("es-shop-stats.pdf");
 
-  }catch(e){
-    alert("Erreur PDF: " + e.message);
-  }
+      debug("📄 PDF généré avec succès");
 
-});
+    } catch (e) {
+      debug("❌ PDF error: " + e.message);
+    }
+  });
+}
 </script>
+
 </body>
 </html>
