@@ -245,9 +245,12 @@ async function load() {
 function render(sales, expenses, stock, products) {
 
     const stockValue = products.reduce((total, p) => {
-  const price = n(p.price || p.selling_price || 0);
-  const stock = n(p.stock || 0);
+
+  const price = n(p.price_buy);       // ✔ coût réel stock
+  const stock = n(p.stock_current);   // ✔ stock réel
+
   return total + (price * stock);
+
 }, 0);
 
   const totalSales = sales.reduce((a, s) =>
@@ -286,19 +289,6 @@ function render(sales, expenses, stock, products) {
 /* =========================
    PDF (CLEAN MODULE ONLY)
 ========================= */
-el("pdfBtn").disabled = true;
-
-function generateId() {
-  return "dev" + Date.now().toString(36).toUpperCase();
-}
-
-function formatDate() {
-  return new Date().toLocaleString("fr-FR", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  });
-}
-
 el("pdfBtn").addEventListener("click", async () => {
 
   if (!ready) {
@@ -308,23 +298,25 @@ el("pdfBtn").addEventListener("click", async () => {
 
   try {
 
-    const target = document.querySelector(".grid");
+    const grid = document.querySelector(".grid");
 
-    const canvas = await html2canvas(target, {
+    // 🔥 FIX LAYOUT
+    grid.style.gridTemplateColumns = "repeat(2, 1fr)";
+    grid.style.gap = "20px";
+
+    const canvas = await html2canvas(grid, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff"
     });
 
+    // 🔁 RESET UI
+    grid.style.gridTemplateColumns = "";
+    grid.style.gap = "";
+
     const img = canvas.toDataURL("image/png");
 
     const pdf = new jsPDF("p", "mm", "a4");
-
-    const pageW = 210;
-
-    /* =========================
-       HEADER SHOPIFY STYLE
-    ========================= */
 
     const id = generateId();
     const date = formatDate();
@@ -338,24 +330,15 @@ el("pdfBtn").addEventListener("click", async () => {
     pdf.text(`ID: ${id}`, 14, 26);
     pdf.text(`Date: ${date}`, 14, 32);
 
-    /* LOGO PLACEHOLDER */
     pdf.setDrawColor(200);
-    pdf.rect(160, 10, 35, 20); // zone logo
+    pdf.rect(160, 10, 35, 20);
     pdf.setFontSize(8);
     pdf.text("ES-SHOP", 172, 22);
-
-    /* =========================
-       CONTENT IMAGE
-    ========================= */
 
     const w = 190;
     const h = (canvas.height * w) / canvas.width;
 
     pdf.addImage(img, "PNG", 10, 40, w, h);
-
-    /* =========================
-       FOOTER
-    ========================= */
 
     pdf.setFontSize(8);
     pdf.setTextColor(120);
@@ -368,6 +351,7 @@ el("pdfBtn").addEventListener("click", async () => {
   } catch (e) {
     debug("❌ PDF: " + e.message);
   }
+
 });
 </script>
 
