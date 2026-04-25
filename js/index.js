@@ -335,7 +335,8 @@ const saleRef = await addDoc(collection(db,"sales"), {
         quantity: item.qty,
         price: item.price,
         price_min: item.price_min,
-        profit: (item.price - item.price_buy) * item.qty
+        profit: (item.price - item.price_buy) * item.qty,
+        createdAt: saleDate
       });
 
       await addDoc(collection(db,"stock_movements"), {
