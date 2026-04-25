@@ -102,6 +102,9 @@ html, body{
 <body>
 
 <h2>📊 Es-Shop Global Dashboard</h2>
+<button id="pdfBtn" style="margin-bottom:15px;padding:10px 15px;border:none;background:#0B5FFF;color:white;border-radius:6px;cursor:pointer;">
+  📄 Télécharger PDF
+</button>
 <div id="debug" style="margin-bottom:10px;color:red;font-size:13px;"></div>
 <div class="grid">
 
@@ -137,21 +140,25 @@ html, body{
 
 </div>
 
-  <nav>
+<nav>
   <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
   <div class="nav-item" data-page="products.html">📦 Produits</div>
   <div class="nav-item" data-page="stats.html">📊 Stats</div>
   <div class="nav-item" data-page="pages.html">🔗 navigation</div>
-  <div class="nav-item active" data-page="loader.html">💲 Loader</div>
+  <div class="nav-item active" data-page="loader.html">📥 Loader</div>
   <div class="nav-item" data-page="losses.html">❌ Pertes</div>
-  </nav>
-  
+</nav>
+
 <script>
 document.querySelectorAll('nav .nav-item').forEach(item => {
   item.addEventListener('click', () => location.href = item.dataset.page);
 });
+
 </script>
-  
+<!-- LIB PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <script type="module">
 import { db } from "./js/firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
@@ -253,6 +260,60 @@ function render(sales, expenses, stock, products){
 
   debug("✅ Render OK");
 }
+</script>
+<script>
+let readyForPdf = false;
+
+document.getElementById("pdfBtn").disabled = true;
+
+/* 🔥 ACTIVER PDF APRÈS RENDER */
+function enablePdf(){
+  readyForPdf = true;
+  document.getElementById("pdfBtn").disabled = false;
+}
+
+/* 🔥 MODIF ICI (IMPORTANT) */
+const oldRender = render;
+render = function(...args){
+  oldRender(...args);
+  enablePdf();
+};
+
+/* 🔥 PDF */
+document.getElementById("pdfBtn").addEventListener("click", async () => {
+
+  if(!readyForPdf){
+    alert("⏳ Données en cours de chargement...");
+    return;
+  }
+
+  try{
+
+    const { jsPDF } = window.jspdf;
+
+    const target = document.querySelector(".grid");
+
+    const canvas = await html2canvas(target, {
+      scale: 2,
+      useCORS: true
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const imgWidth = 190;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+
+    pdf.save("es-shop-stats.pdf");
+
+  }catch(e){
+    alert("Erreur PDF: " + e.message);
+  }
+
+});
 </script>
 </body>
 </html>
