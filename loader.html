@@ -165,7 +165,7 @@ const el = (id) => document.getElementById(id);
 const n = (v) => Number(v) || 0;
 
 /* =========================
-   DEBUG AUTO CLEAN
+   DEBUG
 ========================= */
 let debugTimer;
 
@@ -202,10 +202,11 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 /* =========================
-   LOAD DATA
+   LOAD
 ========================= */
 async function load() {
   try {
+
     const [salesSnap, expSnap, stockSnap, prodSnap] = await Promise.all([
       getDocs(collection(db, "sales")),
       getDocs(collection(db, "expenses")),
@@ -231,7 +232,7 @@ async function load() {
 }
 
 /* =========================
-   BUSINESS LOGIC FIXED
+   RENDER
 ========================= */
 function render(sales, expenses, stock, products) {
 
@@ -247,7 +248,6 @@ function render(sales, expenses, stock, products) {
     a + n(e.amount)
   , 0);
 
-  /* ✔ STOCK */
   const stockIn = stock.filter(s => s.type === "IN")
     .reduce((a, s) => a + n(s.quantity), 0);
 
@@ -256,15 +256,10 @@ function render(sales, expenses, stock, products) {
 
   const stockTotal = stockIn - stockOut;
 
-  /* =========================
-     CORRECTION BUSINESS LOGIC
-  ========================= */
+  const netReal = totalSales - totalExpenses;
 
-  const netReal = totalSales - totalExpenses; // ✔ IMPORTANT
-
-  /* UI */
   el("sales").textContent = totalSales + " FC";
-  el("profit").textContent = totalProfit + " FC"; // brut
+  el("profit").textContent = netReal + " FC"; // ✔ corrigé logique réelle
   el("expenses").textContent = totalExpenses + " FC";
   el("sold").textContent = sales.length;
   el("stockTotal").textContent = stockTotal;
@@ -274,7 +269,7 @@ function render(sales, expenses, stock, products) {
 }
 
 /* =========================
-   PDF FIXED CLEAN
+   PDF (CLEAN MODULE ONLY)
 ========================= */
 el("pdfBtn").disabled = true;
 
@@ -286,7 +281,8 @@ el("pdfBtn").addEventListener("click", async () => {
   }
 
   try {
-    const { jsPDF } = window.jspdf;
+
+    const { jsPDF } = await import("https://esm.sh/jspdf@2.5.1");
 
     const target = document.querySelector(".grid");
 
@@ -305,7 +301,7 @@ el("pdfBtn").addEventListener("click", async () => {
     pdf.addImage(img, "PNG", 10, 10, w, h);
     pdf.save("es-shop-stats.pdf");
 
-    debug("📄 PDF OK");
+    debug("📄 PDF généré");
 
   } catch (e) {
     debug("❌ PDF: " + e.message);
