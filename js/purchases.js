@@ -149,6 +149,7 @@ if (selectedProductId === "new") {
       purchaseId: purchaseRef.id,
       productId,
       quantity,
+      createdAt: now,
       price: unitPrice
     });
 
@@ -305,6 +306,7 @@ window.manualUpdate = async (productId) => {
       purchaseId: purchaseRef.id,
       productId,
       quantity: Math.abs(diff),
+      createdAt: now,
       price: prodSnap.data().price_buy
     });
 
