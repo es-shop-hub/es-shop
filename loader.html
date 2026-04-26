@@ -117,11 +117,26 @@ html, body{
     <small>💰 Chiffre d'affaires</small>
     <div class="big" id="sales">0</div>
   </div>
+  
+  <div class="card">
+  <small>💵 Cash Flow</small>
+  <div class="big" id="cashFlow">0</div>
+</div>
+
+<div class="card">
+  <small>🧠 Profit idéal</small>
+  <div class="big" id="idealProfit">0</div>
+</div>
 
   <div class="card">
     <small>📈 Profit net</small>
     <div class="big" id="profit">0</div>
   </div>
+  
+  <div class="card">
+  <small>🔁 Taux réinvestissement</small>
+  <div class="big" id="reinvestRate">0%</div>
+</div>
 
   <div class="card">
     <small>💸 Dépenses</small>
@@ -215,19 +230,22 @@ onAuthStateChanged(auth, async (user) => {
 async function load() {
   try {
 
-    const [salesSnap, expSnap, stockSnap, prodSnap] = await Promise.all([
-      getDocs(collection(db, "sales")),
-      getDocs(collection(db, "expenses")),
-      getDocs(collection(db, "stock_movements")),
-      getDocs(collection(db, "products"))
-    ]);
+    const [salesSnap, expSnap, stockSnap, prodSnap, invSnap] = await Promise.all([
+  getDocs(collection(db, "sales")),
+  getDocs(collection(db, "expenses")),
+  getDocs(collection(db, "stock_movements")),
+  getDocs(collection(db, "products")),
+  getDocs(collection(db, "investments")) // 🔥 ajouté
+]);
+
+const investments = invSnap.docs.map(d => d.data() || {});
 
     const sales = salesSnap.docs.map(d => d.data() || {});
     const expenses = expSnap.docs.map(d => d.data() || {});
     const stock = stockSnap.docs.map(d => d.data() || {});
     const products = prodSnap.docs.map(d => d.data() || {});
 
-    render(sales, expenses, stock, products);
+    render(sales, expenses, stock, products, investments);
 
     ready = true;
     el("pdfBtn").disabled = false;
@@ -242,7 +260,7 @@ async function load() {
 /* =========================
    RENDER
 ========================= */
-function render(sales, expenses, stock, products) {
+function render(sales, expenses, stock, products, investments) {
 
     const stockValue = products.reduce((total, p) => {
 
@@ -253,17 +271,33 @@ function render(sales, expenses, stock, products) {
 
 }, 0);
 
-  const totalSales = sales.reduce((a, s) =>
-    a + n(s.total_amount || s.amount || s.amount_total)
-  , 0);
+const totalSales = sales.reduce((a, s) =>
+  a + n(s.total_amount || s.amount || s.amount_total)
+, 0);
 
-  const totalProfit = sales.reduce((a, s) =>
-    a + n(s.total_profit || s.profit)
-  , 0);
+const totalExpenses = expenses.reduce((a, e) =>
+  a + n(e.amount)
+, 0);
 
-  const totalExpenses = expenses.reduce((a, e) =>
-    a + n(e.amount)
-  , 0);
+// 🔥 réinvestissement réel
+const totalReinvested = investments.reduce((a, i) =>
+  a + n(i.reinvested)
+, 0);
+
+// 🔥 profit net réel
+const netProfit = totalSales - totalExpenses - totalReinvested;
+
+// 🔥 cash flow
+const cashFlow = totalSales - totalExpenses;
+
+// 🔥 profit idéal (sans dépenses ni reinvest)
+const idealProfit = sales.reduce((a, s) =>
+  a + n(s.total_profit || s.profit)
+, 0);
+
+const reinvestRate = totalSales > 0
+  ? (totalReinvested / totalSales) * 100
+  : 0;
 
   const stockIn = stock.filter(s => s.type === "IN")
     .reduce((a, s) => a + n(s.quantity), 0);
@@ -273,15 +307,17 @@ function render(sales, expenses, stock, products) {
 
   const stockTotal = stockIn - stockOut;
 
-  const netReal = totalSales - totalExpenses;
   
   el("stockValue").textContent = stockValue + " FC";
   el("sales").textContent = totalSales + " FC";
-  el("profit").textContent = netReal + " FC"; // ✔ corrigé logique réelle
+  el("profit").textContent = netProfit + " FC"; // ✔ vrai profit
   el("expenses").textContent = totalExpenses + " FC";
   el("sold").textContent = sales.length;
   el("stockTotal").textContent = stockTotal;
   el("products").textContent = products.length;
+  el("cashFlow").textContent = cashFlow + " FC";
+el("idealProfit").textContent = idealProfit + " FC";
+el("reinvestRate").textContent = reinvestRate.toFixed(1) + "%";
 
   debug("✅ OK");
 }
