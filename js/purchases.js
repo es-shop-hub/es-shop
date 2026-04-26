@@ -1,4 +1,4 @@
-// purchases.js - VERSION FINALE PRO v2  (+ filtre côté client bon à <300 produits)
+// purchases.js - VERSION FINALE PRO v2 (+ filtre côté client bon à <300 produits) + réinvestir 
 import { 
   db, collection, addDoc, getDocs, doc, updateDoc, query, where, serverTimestamp, getDoc 
 } from './firebase.js';
@@ -40,6 +40,47 @@ const logsCol = collection(db, 'logs');
 //----- recherche et filtre------
 if (stockSearch) stockSearch.addEventListener('input', applyFilters);
 if (stockFilter) stockFilter.addEventListener('change', applyFilters);
+
+// ----- réinvestissement ------
+async function computeReinvestmentAmount(purchaseDate, purchaseCost) {
+
+  // 1. récupérer ventes AVANT achat
+  const salesSnap = await getDocs(
+    query(collection(db, "sales"), where("createdAt", "<=", purchaseDate))
+  );
+
+  let totalSalesAmount = 0;
+
+  salesSnap.forEach(doc => {
+    const s = doc.data();
+    totalSalesAmount += Number(s.amount_paid || s.total_amount || 0);
+  });
+
+  // 2. récupérer dépenses AVANT achat (déjà enregistrées)
+  const expensesSnap = await getDocs(
+    query(collection(db, "expenses"), where("createdAt", "<=", purchaseDate))
+  );
+
+  let totalExpenses = 0;
+
+  expensesSnap.forEach(doc => {
+    const e = doc.data();
+    totalExpenses += Number(e.amount || 0);
+  });
+
+  // 3. cash disponible réel
+  const availableCash = totalSalesAmount - totalExpenses;
+
+  // 4. montant réinvesti réel
+  const reinvested = Math.min(availableCash, purchaseCost);
+
+  return {
+    reinvested,
+    external: purchaseCost - reinvested
+  };
+}
+
+// -----
 
 function applyFilters() {
   let list = [...allProducts];
@@ -149,8 +190,8 @@ if (selectedProductId === "new") {
       purchaseId: purchaseRef.id,
       productId,
       quantity,
-      createdAt: now,
-      price: unitPrice
+      price: unitPrice,
+      createdAt: now
     });
 
     // --- STOCK MOVEMENT ---
@@ -167,7 +208,22 @@ if (selectedProductId === "new") {
     // --- RECALCUL STOCK ---
     await recalcStock(productId);
     
-    //--- EXPENSE supprimé 
+    // -- EXPENSES -----
+    const { reinvested, external } = await computeReinvestmentAmount(now, quantity * unitPrice);
+
+// 🔥 enregistre seulement le réinvestissement réel
+if (reinvested > 0) {
+  await addDoc(collection(db, "expenses"), {
+    label: "Réinvestissement stock",
+    category: "reinvestment",
+    amount: reinvested,
+    type: "variable",
+    relatedTo: purchaseRef.id,
+    createdAt: now,
+    createdBy: currentUserId,
+    note: "Auto calculé"
+      });
+    }
 
     // --- LOG ---
     await addDoc(logsCol, {
@@ -299,18 +355,26 @@ window.manualUpdate = async (productId) => {
       purchaseId: purchaseRef.id,
       productId,
       quantity: Math.abs(diff),
-      createdAt: now,
-      price: prodSnap.data().price_buy
+      price: prodSnap.data().price_buy,
+      createdAt: now
     });
 
     // 5. EXPENSE
-    await addDoc(collection(db, "expenses"), {
-      type: "manual_purchase",
-      amount: Math.abs(diff) * prodSnap.data().price_buy,
-      relatedPurchaseId: purchaseRef.id,
-      createdAt: now,
-      createdBy: currentUserId
-    });
+    const { reinvested, external } = await computeReinvestmentAmount(now, quantity * unitPrice);
+
+// 🔥 enregistre seulement le réinvestissement réel
+if (reinvested > 0) {
+  await addDoc(collection(db, "expenses"), {
+    label: "Réinvestissement stock",
+    category: "reinvestment",
+    amount: reinvested,
+    type: "variable",
+    relatedTo: purchaseRef.id,
+    createdAt: now,
+    createdBy: currentUserId,
+    note: "Auto calculé"
+  });
+}
 
     // 6. LOG
     await addDoc(logsCol, {
