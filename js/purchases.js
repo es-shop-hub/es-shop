@@ -208,22 +208,24 @@ if (selectedProductId === "new") {
     // --- RECALCUL STOCK ---
     await recalcStock(productId);
     
-    // -- EXPENSES -----
-    const { reinvested, external } = await computeReinvestmentAmount(now, quantity * unitPrice);
+    // -- RÉINVESTISSEMENT avec condition-----
+    const totalCost = quantity * unitPrice;
 
-// 🔥 enregistre seulement le réinvestissement réel
-if (reinvested > 0) {
-  await addDoc(collection(db, "expenses"), {
-    label: "Réinvestissement stock",
-    category: "reinvestment",
-    amount: reinvested,
-    type: "variable",
-    relatedTo: purchaseRef.id,
-    createdAt: now,
-    createdBy: currentUserId,
-    note: "Auto calculé"
-      });
-    }
+const { reinvested, external } = await computeReinvestmentAmount(now, totalCost);
+
+// 🔥 ENREGISTREMENT PROPRE DANS investments
+await addDoc(collection(db, "investments"), {
+  purchaseId: purchaseRef.id,
+
+  amount: totalCost,
+  reinvested,
+  external,
+
+  type: "stock",
+
+  createdAt: now,
+  createdBy: currentUserId
+});
 
     // --- LOG ---
     await addDoc(logsCol, {
@@ -359,22 +361,24 @@ window.manualUpdate = async (productId) => {
       createdAt: now
     });
 
-    // 5. EXPENSE
-    const { reinvested, external } = await computeReinvestmentAmount(now, quantity * unitPrice);
+    // --- RÉINVESTISSEMENT avec condition-----
+    const totalCost = quantity * unitPrice;
 
-// 🔥 enregistre seulement le réinvestissement réel
-if (reinvested > 0) {
-  await addDoc(collection(db, "expenses"), {
-    label: "Réinvestissement stock",
-    category: "reinvestment",
-    amount: reinvested,
-    type: "variable",
-    relatedTo: purchaseRef.id,
-    createdAt: now,
-    createdBy: currentUserId,
-    note: "Auto calculé"
-  });
-}
+const { reinvested, external } = await computeReinvestmentAmount(now, totalCost);
+
+// 🔥 ENREGISTREMENT PROPRE DANS investments
+await addDoc(collection(db, "investments"), {
+  purchaseId: purchaseRef.id,
+
+  amount: totalCost,
+  reinvested,
+  external,
+
+  type: "stock",
+
+  createdAt: now,
+  createdBy: currentUserId
+});
 
     // 6. LOG
     await addDoc(logsCol, {
