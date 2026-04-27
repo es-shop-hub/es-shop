@@ -1,4 +1,4 @@
-// products.js - VERSION FINALE ULTIME PRO + search 
+// products.js - VERSION FINALE ULTIME PRO + search + investment 
 import { 
   db, collection, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, enableIndexedDbPersistence, query, where
 } from './firebase.js';
@@ -129,6 +129,15 @@ addBtn.addEventListener('click', async () => {
   const price_sell = parseFloat(prompt("Prix vente?"));
   const price_min = parseFloat(prompt("Prix minimum autorisé?"));
   const stock = parseInt(prompt("Stock initial?"));
+  // --- INVESTMENT SOURCE (USER DECIDES ONLY SOURCE) ---
+const sourceType = prompt(
+  "D'où vient l'argent ?\n\n- reinvested = argent des ventes\n- external = argent personnel"
+)?.trim().toLowerCase();
+
+// --- VALIDATION ---
+if (!sourceType || !["reinvested", "external"].includes(sourceType)) {
+  return alert("Source invalide (reinvested / external)");
+}
 
   if (!name || !variant || isNaN(price_buy) || isNaN(price_sell) || isNaN(stock) || isNaN(price_min)) {
     return alert("Valeurs invalides");
@@ -163,6 +172,26 @@ addBtn.addEventListener('click', async () => {
     createdBy: currentUserId,
     createdAt: now
   });
+  
+  // --- RÉINVESTI ---
+  let reinvested = 0;
+let external = 0;
+
+if (sourceType === "reinvested") {
+  reinvested = sourceAmount;
+} else {
+  external = sourceAmount;
+}
+
+await addDoc(collection(db, "investments"), {
+  purchaseId: null,
+  amount: sourceAmount,
+  reinvested,
+  external,
+  type: "stock",
+  createdAt: now,
+  createdBy: currentUserId
+});
 
   // --- LOG ---
   await addDoc(collection(db, "logs"), {
