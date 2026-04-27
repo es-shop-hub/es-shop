@@ -1,4 +1,4 @@
-// purchases.js - VERSION FINALE PRO v2 (+ filtre côté client bon à <300 produits) + réinvestir 
+// purchases.js - VERSION FINALE PRO v4 (+ filtre côté client bon à <300 produits) + réinvestir 
 import { 
   db, collection, addDoc, getDocs, doc, updateDoc, query, where, serverTimestamp, getDoc 
 } from './firebase.js';
@@ -122,22 +122,18 @@ purchaseForm.addEventListener('submit', async e => {
   if (!currentUserId) return alert("Utilisateur non connecté");
 
   const supplier = document.getElementById('supplierName').value.trim();
-  
-  const selectedProductId = productSelect.value;
+  const productId = productSelect.value;
 
-let productName;
+  if (!productId) return alert("Produit obligatoire");
 
-if (selectedProductId === "new") {
-  productName = productNameInput.value.trim();
-} else {
-  const selectedProductData = allProducts.find(p => p.id === selectedProductId);
-  productName = selectedProductData?.name || "";
-}
+  const selectedProductData = allProducts.find(p => p.id === productId);
+  const productName = selectedProductData?.name || "";
 
   const quantity = parseInt(document.getElementById('quantity').value);
-  const unitPrice = parseFloat(document.getElementById('unitPrice').value);
+  const rawPrice = document.getElementById('unitPrice').value;
+  const unitPrice = rawPrice ? parseFloat(rawPrice) : NaN;
 
-  if (!supplier || !productName || quantity <= 0 || unitPrice <= 0) {
+  if (!supplier || !productName || quantity <= 0) {
     return alert("Valeurs invalides");
   }
 
@@ -145,49 +141,38 @@ if (selectedProductId === "new") {
     await checkUser(currentUserId);
     const now = serverTimestamp();
 
+    // --- GET CURRENT PRODUCT ---
+    const prodRef = doc(db, "products", productId);
+    const prodSnap = await getDoc(prodRef);
+    if (!prodSnap.exists()) return;
+
+    const currentData = prodSnap.data();
+
+    // --- PRIX FINAL ---
+    const finalPrice = isNaN(unitPrice)
+      ? currentData.price_buy
+      : unitPrice;
+
     // --- CREATE PURCHASE ---
     const purchaseRef = await addDoc(purchasesCol, {
       supplier,
-      total_cost: quantity * unitPrice,
+      total_cost: quantity * finalPrice,
       createdAt: now
     });
 
-    // --- FIND PRODUCT ---
-const selectedProductId = productSelect.value;
-
-if (!selectedProductId) {
-  return alert("Produit obligatoire");
-}
-
-const productId = selectedProductId;
-
-// --- FIND PRODUCT ---
-const productId = productSelect.value;
-if (!productId) return alert("Produit obligatoire");
-
-// --- GET CURRENT PRODUCT ---
-const prodRef = doc(db, "products", productId);
-const prodSnap = await getDoc(prodRef);
-if (!prodSnap.exists()) return;
-
-const currentData = prodSnap.data();
-
-// --- PRIX FINAL ---
-const finalPrice = isNaN(unitPrice) ? currentData.price_buy : unitPrice;
-
-// --- UPDATE PRODUIT ---
-await updateDoc(prodRef, {
-  price_buy: finalPrice, // seulement si input fourni
-  stock_current: (currentData.stock_current || 0) + quantity,
-  updatedAt: now
-});
+    // --- UPDATE PRODUIT (stock +=) ---
+    await updateDoc(prodRef, {
+      price_buy: finalPrice,
+      stock_current: (currentData.stock_current || 0) + quantity,
+      updatedAt: now
+    });
 
     // --- PURCHASE ITEM ---
     await addDoc(purchaseItemsCol, {
       purchaseId: purchaseRef.id,
       productId,
       quantity,
-      price: unitPrice,
+      price: finalPrice,
       createdAt: now
     });
 
@@ -201,28 +186,28 @@ await updateDoc(prodRef, {
       createdBy: currentUserId,
       createdAt: now
     });
-    
-    // -- RÉINVESTISSEMENT avec condition-----
-    const result = await computeInvestment(productId, quantity, unitPrice);
 
-if (result.shouldInsert) {
-  await addDoc(collection(db, "investments"), {
-    purchaseId: purchaseRef.id,
-    amount: quantity * unitPrice,
-    reinvested: result.reinvested,
-    external: 0,
-    type: "stock",
-    createdAt: now,
-    createdBy: currentUserId
-  });
-}
+    // --- INVEST ---
+    const result = await computeInvestment(productId, quantity, finalPrice);
+
+    if (result.shouldInsert) {
+      await addDoc(collection(db, "investments"), {
+        purchaseId: purchaseRef.id,
+        amount: quantity * finalPrice,
+        reinvested: result.reinvested,
+        external: 0,
+        type: "stock",
+        createdAt: now,
+        createdBy: currentUserId
+      });
+    }
 
     // --- LOG ---
     await addDoc(logsCol, {
       userId: currentUserId,
       action: "add_purchase",
       targetId: purchaseRef.id,
-      details: { supplier, productName, variant, quantity, unitPrice },
+      details: { supplier, productName, quantity, finalPrice },
       createdAt: now
     });
 
@@ -234,12 +219,6 @@ if (result.shouldInsert) {
     alert(err.message || "Erreur lors de l'achat");
   }
 });
-
-  await updateDoc(doc(productsCol, productId), {
-    stock_current: total,
-    updatedAt: serverTimestamp()
-  });
-}
 
 // --- LOAD STOCK ---
 async function loadStock() {
@@ -392,3 +371,4 @@ onAuthStateChanged(auth, async (user) => {
     alert(e.message);
   }
 });
+  
