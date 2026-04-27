@@ -42,41 +42,38 @@ if (stockSearch) stockSearch.addEventListener('input', applyFilters);
 if (stockFilter) stockFilter.addEventListener('change', applyFilters);
 
 // ----- réinvestissement ------
-async function computeReinvestmentAmount(purchaseDate, purchaseCost) {
-
-  // 1. récupérer ventes AVANT achat
-  const salesSnap = await getDocs(
-    query(collection(db, "sales"), where("createdAt", "<=", purchaseDate))
+async function getStockBeforePurchase(productId) {
+  const snap = await getDocs(
+    query(collection(db, "stock_movements"), where("productId", "==", productId))
   );
 
-  let totalSalesAmount = 0;
+  let stock = 0;
 
-  salesSnap.forEach(doc => {
-    const s = doc.data();
-    totalSalesAmount += Number(s.amount_paid || s.total_amount || 0);
+  snap.forEach(d => {
+    const m = d.data();
+    if (m.type === "IN") stock += Number(m.quantity || 0);
+    if (m.type === "OUT") stock -= Number(m.quantity || 0);
   });
 
-  // 2. récupérer dépenses AVANT achat (déjà enregistrées)
-  const expensesSnap = await getDocs(
-    query(collection(db, "expenses"), where("createdAt", "<=", purchaseDate))
-  );
+  return stock;
+}
 
-  let totalExpenses = 0;
+async function computeInvestment(productId, NS, unitPrice) {
 
-  expensesSnap.forEach(doc => {
-    const e = doc.data();
-    totalExpenses += Number(e.amount || 0);
-  });
+  const AS = await getStockBeforePurchase(productId);
 
-  // 3. cash disponible réel
-  const availableCash = totalSalesAmount - totalExpenses;
+  const diff = NS - AS;
 
-  // 4. montant réinvesti réel
-  const reinvested = Math.min(availableCash, purchaseCost);
+  if (diff > 0) {
+    return {
+      shouldInsert: true,
+      reinvested: diff * unitPrice,
+      external: 0
+    };
+  }
 
   return {
-    reinvested,
-    external: purchaseCost - reinvested
+    shouldInsert: false
   };
 }
 
@@ -137,8 +134,6 @@ if (selectedProductId === "new") {
   productName = selectedProductData?.name || "";
 }
 
-  const variant = variantInput.value.trim();
-  const imageUrl = imageUrlInput.value.trim();
   const quantity = parseInt(document.getElementById('quantity').value);
   const unitPrice = parseFloat(document.getElementById('unitPrice').value);
 
@@ -157,33 +152,35 @@ if (selectedProductId === "new") {
       createdAt: now
     });
 
-    // --- FIND OR CREATE PRODUCT ---
-    const prodQuery = query(
-      productsCol,
-      where('name', '==', productName),
-      where('variant', '==', variant || "")
-    );
-    const prodSnap = await getDocs(prodQuery);
+    // --- FIND PRODUCT ---
+const selectedProductId = productSelect.value;
 
-    let productId;
-    if (!prodSnap.empty) {
-      productId = prodSnap.docs[0].id;
-    } else {
-      const newProd = await addDoc(productsCol, {
-        name: productName,
-        variant: variant || "",
-        imageUrl: imageUrl || "",
-        category: "default",
-        price_buy: unitPrice,
-        price_sell: unitPrice * DEFAULT_MARGIN, // marge par défaut
-        stock_current: 0,
-        stock_alert: STOCK_ALERT_THRESHOLD,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now
-      });
-      productId = newProd.id;
-    }
+if (!selectedProductId) {
+  return alert("Produit obligatoire");
+}
+
+const productId = selectedProductId;
+
+// --- FIND PRODUCT ---
+const productId = productSelect.value;
+if (!productId) return alert("Produit obligatoire");
+
+// --- GET CURRENT PRODUCT ---
+const prodRef = doc(db, "products", productId);
+const prodSnap = await getDoc(prodRef);
+if (!prodSnap.exists()) return;
+
+const currentData = prodSnap.data();
+
+// --- PRIX FINAL ---
+const finalPrice = isNaN(unitPrice) ? currentData.price_buy : unitPrice;
+
+// --- UPDATE PRODUIT ---
+await updateDoc(prodRef, {
+  price_buy: finalPrice, // seulement si input fourni
+  stock_current: (currentData.stock_current || 0) + quantity,
+  updatedAt: now
+});
 
     // --- PURCHASE ITEM ---
     await addDoc(purchaseItemsCol, {
@@ -204,28 +201,21 @@ if (selectedProductId === "new") {
       createdBy: currentUserId,
       createdAt: now
     });
-
-    // --- RECALCUL STOCK ---
-    await recalcStock(productId);
     
     // -- RÉINVESTISSEMENT avec condition-----
-    const totalCost = quantity * unitPrice;
+    const result = await computeInvestment(productId, quantity, unitPrice);
 
-const { reinvested, external } = await computeReinvestmentAmount(now, totalCost);
-
-// 🔥 ENREGISTREMENT PROPRE DANS investments
-await addDoc(collection(db, "investments"), {
-  purchaseId: purchaseRef.id,
-
-  amount: totalCost,
-  reinvested,
-  external,
-
-  type: "stock",
-
-  createdAt: now,
-  createdBy: currentUserId
-});
+if (result.shouldInsert) {
+  await addDoc(collection(db, "investments"), {
+    purchaseId: purchaseRef.id,
+    amount: quantity * unitPrice,
+    reinvested: result.reinvested,
+    external: 0,
+    type: "stock",
+    createdAt: now,
+    createdBy: currentUserId
+  });
+}
 
     // --- LOG ---
     await addDoc(logsCol, {
@@ -245,16 +235,6 @@ await addDoc(collection(db, "investments"), {
   }
 });
 
-// --- RECALCUL STOCK ---
-async function recalcStock(productId) {
-  const movSnap = await getDocs(query(stockMovementsCol, where("productId", "==", productId)));
-  let total = 0;
-  movSnap.forEach(docSnap => {
-    const m = docSnap.data();
-    if (m.type === "IN") total += m.quantity;
-    if (m.type === "OUT") total -= m.quantity;
-  });
-
   await updateDoc(doc(productsCol, productId), {
     stock_current: total,
     updatedAt: serverTimestamp()
@@ -268,7 +248,7 @@ async function loadStock() {
 
   allProducts = [];
   
-  productSelect.innerHTML = '<option value="">-- Sélectionner --</option>';
+  productSelect.innerHTML = '<option value="">-- Sélectionner --</option>'; //ici
 
   prodSnap.forEach(docSnap => {
     const p = docSnap.data();
@@ -361,24 +341,24 @@ window.manualUpdate = async (productId) => {
       createdAt: now
     });
 
-    // --- RÉINVESTISSEMENT avec condition-----
-    const totalCost = quantity * unitPrice;
+    // --- RÉINVESTISSEMENT (MANUAL UPDATE) ---
+const result = await computeInvestment(
+  productId,
+  Math.abs(diff),
+  prodSnap.data().price_buy
+);
 
-const { reinvested, external } = await computeReinvestmentAmount(now, totalCost);
-
-// 🔥 ENREGISTREMENT PROPRE DANS investments
-await addDoc(collection(db, "investments"), {
-  purchaseId: purchaseRef.id,
-
-  amount: totalCost,
-  reinvested,
-  external,
-
-  type: "stock",
-
-  createdAt: now,
-  createdBy: currentUserId
-});
+if (result.shouldInsert) {
+  await addDoc(collection(db, "investments"), {
+    purchaseId: purchaseRef.id,
+    amount: Math.abs(diff) * prodSnap.data().price_buy,
+    reinvested: result.reinvested,
+    external: 0,
+    type: "stock",
+    createdAt: now,
+    createdBy: currentUserId
+  });
+}
 
     // 6. LOG
     await addDoc(logsCol, {
