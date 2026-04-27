@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.firebaseio.com https://*.googleapis.com;">
+
+<title>Investissements</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding-bottom: 70px;
+  background: #f5f6fa;
+}
+
+h2 {
+  text-align: center;
+  margin-top: 20px;
+}
+
+form {
+  max-width: 500px;
+  margin: 20px auto;
+  padding: 20px;
+  background: #fff;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+form input, form select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+form button {
+  padding: 10px;
+  background: #192a56;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+table {
+  width: 95%;
+  margin: 20px auto;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+  text-align: center;
+}
+
+th {
+  background: #192a56;
+  color: white;
+}
+
+/* NAV */
+nav {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: #111;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0;
+  color: white;
+  z-index: 1000;
+}
+nav div {
+  text-align: center;
+  font-size: 12px;
+  cursor: pointer;
+}
+nav div.active {
+  color: #D4AF37;
+  font-weight: bold;
+}
+.filters {
+  width: 95%;
+  margin: 10px auto;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.filters select {
+  padding: 8px;
+  border-radius: 6px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Ajouter investissement</h2>
+<div class="filters">
+  <select id="filterType">
+    <option value="">Tous types</option>
+    <option value="stock">Stock</option>
+    <option value="other">Autre</option>
+  </select>
+
+  <select id="filterSource">
+    <option value="">Toutes sources</option>
+    <option value="reinvested">Réinvesti</option>
+    <option value="external">Externe</option>
+  </select>
+</div>
+
+<form id="investmentForm">
+
+  <label>Montant total :</label>
+  <input type="number" id="amount" min="0" required>
+
+  <label>Type :</label>
+  <select id="type">
+    <option value="stock">Stock</option>
+    <option value="other">Autre</option>
+  </select>
+
+  <label>Source :</label>
+  <select id="sourceType">
+    <option value="reinvested">Réinvesti</option>
+    <option value="external">Externe</option>
+  </select>
+
+  <label>Montant :</label>
+  <input type="number" id="sourceAmount" min="0" required>
+
+  <button type="submit">Ajouter</button>
+</form>
+
+<h2>Historique</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Montant</th>
+  <th>Réinvesti</th>
+  <th>Externe</th>
+  <th>Type</th>
+  <th>Date</th>
+</tr>
+</thead>
+<tbody id="investmentTable"></tbody>
+</table>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="settings.html">⚙️ Paramètres</div>
+  <div class="nav-item" data-page="purchases.html">📥 Achats</div>
+  <div class="nav-item active" data-page="investments.html">💰 Invest</div>
+</nav>
+
+<script type="module">
+import {
+  db,
+  collection,
+  addDoc,
+  getDocs,
+  serverTimestamp,
+  query,
+  where
+} from './js/firebase.js';
+
+const form = document.getElementById('investmentForm');
+const table = document.getElementById('investmentTable');
+
+// NAV
+document.querySelectorAll('nav .nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    location.href = item.dataset.page;
+  });
+});
+
+// FILTERS
+const filterType = document.getElementById('filterType');
+const filterSource = document.getElementById('filterSource');
+
+if (filterType) filterType.addEventListener('change', loadInvestments);
+if (filterSource) filterSource.addEventListener('change', loadInvestments);
+
+// --- LOAD INVESTMENTS (UNIQUE VERSION) ---
+async function loadInvestments() {
+  table.replaceChildren();
+
+  let qRef = collection(db, "investments");
+  const constraints = [];
+
+  if (filterType && filterType.value) {
+    constraints.push(where("type", "==", filterType.value));
+  }
+
+  if (filterSource && filterSource.value === "reinvested") {
+    constraints.push(where("reinvested", ">", 0));
+  }
+
+  if (filterSource && filterSource.value === "external") {
+    constraints.push(where("external", ">", 0));
+  }
+
+  if (constraints.length > 0) {
+    qRef = query(qRef, ...constraints);
+  }
+
+  const snap = await getDocs(qRef);
+
+  snap.forEach(docSnap => {
+    const d = docSnap.data();
+
+    const tr = document.createElement('tr');
+
+    const tdAmount = document.createElement('td');
+    tdAmount.textContent = d.amount || 0;
+
+    const tdRe = document.createElement('td');
+    tdRe.textContent = d.reinvested || 0;
+
+    const tdEx = document.createElement('td');
+    tdEx.textContent = d.external || 0;
+
+    const tdType = document.createElement('td');
+    tdType.textContent = d.type || "";
+
+    const tdDate = document.createElement('td');
+    tdDate.textContent = d.createdAt
+      ? new Date(d.createdAt.seconds * 1000).toLocaleDateString()
+      : "-";
+
+    tr.appendChild(tdAmount);
+    tr.appendChild(tdRe);
+    tr.appendChild(tdEx);
+    tr.appendChild(tdType);
+    tr.appendChild(tdDate);
+
+    table.appendChild(tr);
+  });
+}
+
+// --- ADD INVESTMENT ---
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const amount = parseFloat(document.getElementById('amount').value);
+  const type = document.getElementById('type').value;
+  const sourceType = document.getElementById('sourceType').value;
+  const sourceAmount = parseFloat(document.getElementById('sourceAmount').value);
+
+  if (!amount || amount <= 0 || !sourceAmount || sourceAmount <= 0) {
+    alert("Valeurs invalides");
+    return;
+  }
+
+  let reinvested = 0;
+  let external = 0;
+
+  if (sourceType === "reinvested") {
+    reinvested = sourceAmount;
+  } else {
+    external = sourceAmount;
+  }
+
+  await addDoc(collection(db, "investments"), {
+    amount,
+    reinvested,
+    external,
+    type,
+    createdAt: serverTimestamp()
+  });
+
+  form.reset();
+  await loadInvestments();
+});
+
+// INIT
+loadInvestments();
+</script>
+
+</body>
+</html>
