@@ -124,6 +124,11 @@ html, body{
 </div>
 
 <div class="card">
+  <small>📩 Capital externe</small>
+  <div class="big" id="externalValue">0</div>
+</div>
+
+<div class="card">
   <small>🧠 Profit idéal</small>
   <div class="big" id="idealProfit">0</div>
 </div>
@@ -141,6 +146,16 @@ html, body{
   <div class="card">
     <small>💸 Dépenses</small>
     <div class="big" id="expenses">0</div>
+  </div>
+  
+  <div class="card">
+    <small>🔐 Dettes</small>
+    <div class="big" id="debts">0</div>
+  </div>
+  
+  <div class="card">
+    <small>❌ Pertes</small>
+    <div class="big" id="losses">0</div>
   </div>
 
   <div class="card">
@@ -230,12 +245,22 @@ onAuthStateChanged(auth, async (user) => {
 async function load() {
   try {
 
-    const [salesSnap, expSnap, stockSnap, prodSnap, invSnap] = await Promise.all([
+    const [
+  salesSnap,
+  expSnap,
+  stockSnap,
+  prodSnap,
+  invSnap,
+  debtSnap,
+  lossSnap
+] = await Promise.all([
   getDocs(collection(db, "sales")),
   getDocs(collection(db, "expenses")),
   getDocs(collection(db, "stock_movements")),
   getDocs(collection(db, "products")),
-  getDocs(collection(db, "investments")) // 🔥 ajouté
+  getDocs(collection(db, "investments")),
+  getDocs(collection(db, "debts")),
+  getDocs(collection(db, "losses"))
 ]);
 
 const investments = invSnap.docs.map(d => d.data() || {});
@@ -244,8 +269,10 @@ const investments = invSnap.docs.map(d => d.data() || {});
     const expenses = expSnap.docs.map(d => d.data() || {});
     const stock = stockSnap.docs.map(d => d.data() || {});
     const products = prodSnap.docs.map(d => d.data() || {});
+    const debts = debtSnap.docs.map(d => d.data() || {});
+    const losses = lossSnap.docs.map(d => d.data() || {});
 
-    render(sales, expenses, stock, products, investments);
+    render(sales, expenses, stock, products, investments, debts, losses);
 
     ready = true;
     el("pdfBtn").disabled = false;
@@ -260,7 +287,7 @@ const investments = invSnap.docs.map(d => d.data() || {});
 /* =========================
    RENDER
 ========================= */
-function render(sales, expenses, stock, products, investments) {
+function render(sales, expenses, stock, products, investments, debts, losses) {
 
     const stockValue = products.reduce((total, p) => {
 
@@ -275,20 +302,32 @@ const totalSales = sales.reduce((a, s) =>
   a + n(s.total_amount || s.amount || s.amount_total)
 , 0);
 
+const totalDebts = debts.reduce((a, d) =>
+  a + n(d.amount_remaining),
+0);
+
+const totalLosses = losses.reduce((a, l) =>
+  a + n(l.estimated_value),
+0);
+
 const totalExpenses = expenses.reduce((a, e) =>
   a + n(e.amount)
 , 0);
 
-// 🔥 réinvestissement réel
-const totalReinvested = investments.reduce((a, i) =>
-  a + n(i.reinvested)
-, 0);
+// 🔥 split propre investments
+const totalReinvested = investments
+  .filter(i => n(i.reinvested) > 0)
+  .reduce((a, i) => a + n(i.reinvested), 0);
 
-// 🔥 profit net réel
-const netProfit = totalSales - totalExpenses - totalReinvested;
+const totalExternal = investments
+  .filter(i => n(i.external) > 0)
+  .reduce((a, i) => a + n(i.external), 0);
+
+// 🔥 PROFIT NET PROPRE
+const netProfit = totalSales - totalExpenses - totalReinvested - totalLosses;
 
 // 🔥 cash flow
-const cashFlow = totalSales - totalExpenses;
+const realCash = totalSales - totalExpenses - totalDebts;
 
 // 🔥 profit idéal (sans dépenses ni reinvest)
 const idealProfit = sales.reduce((a, s) =>
@@ -317,7 +356,11 @@ const reinvestRate = totalSales > 0
   el("products").textContent = products.length;
   el("cashFlow").textContent = cashFlow + " FC";
 el("idealProfit").textContent = idealProfit + " FC";
+el("externalValue")?.textContent = totalExternal + " FC";
 el("reinvestRate").textContent = reinvestRate.toFixed(1) + "%";
+
+el("debts").textContent = totalDebts + " FC";
+el("losses").textContent = totalLosses + " FC";
 
   debug("✅ OK");
 }
