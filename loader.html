@@ -78,7 +78,7 @@ h2{
   text-overflow:ellipsis;
 }
 .card .big{
-  font-size:8%; /* ↓ réduction réelle */
+  font-size:10px; /* ↓ réduction réelle */
   font-weight:500;
   line-height:1;
 
@@ -272,6 +272,11 @@ function debug(msg) {
 
   box.textContent = msg;
 
+  // 🔥 force repaint immédiat
+  box.style.display = "none";
+  box.offsetHeight; // reflow hack
+  box.style.display = "block";
+
   clearTimeout(debugTimer);
   debugTimer = setTimeout(() => {
     box.textContent = "";
@@ -288,7 +293,17 @@ let ready = false;
 ========================= */
 const auth = getAuth();
 
+let authResolved = false;
+
+setTimeout(() => {
+  if (!authResolved) {
+    debug("⏳ Auth lente...");
+  }
+}, 2000);
+
 onAuthStateChanged(auth, async (user) => {
+  authResolved = true;
+
   if (!user) {
     location.href = "login.html";
     return;
