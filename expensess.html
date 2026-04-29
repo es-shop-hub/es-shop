@@ -356,16 +356,22 @@ async function loadProducts() {
 
 // ================= DATA =================
 async function loadData() {
-  const q = query(collection(db, "expensess"), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
+  try {
+    const q = query(collection(db, "expensess"), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
 
-  allData = [];
+    allData = [];
 
-  snap.forEach(d => {
-    allData.push({ id: d.id, ...d.data() });
-  });
+    snap.forEach(d => {
+      allData.push({ id: d.id, ...d.data() });
+    });
 
-  render();
+    render();
+
+  } catch (e) {
+    debug("❌ loadData: " + e.message);
+    console.error(e);
+  }
 }
 
 // ================= FILTER =================
