@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion des Dépenses</title>
+
+<style>
+:root {
+  --primary:#0B5FFF;
+  --dark:#111;
+  --light:#f5f7fa;
+  --danger:#e74c3c;
+}
+
+body {
+  margin:0;
+  font-family:Arial;
+  background:var(--light);
+}
+
+/* HEADER */
+.header {
+  background:#fff;
+  padding:15px;
+  text-align:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+
+/* CONTAINER */
+.container {
+  max-width:900px;
+  margin:auto;
+  padding:20px;
+}
+
+/* SWITCH */
+.switch-box {
+  display:flex;
+  gap:10px;
+  margin-bottom:15px;
+}
+
+.switch-box button {
+  flex:1;
+  padding:10px;
+  border:none;
+  cursor:pointer;
+  background:#ddd;
+  border-radius:8px;
+  transition:0.2s;
+}
+
+.switch-box button.active {
+  background:var(--primary);
+  color:#fff;
+}
+
+/* FORM */
+.form-box {
+  background:#fff;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:15px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+
+.form-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+input, select, textarea {
+  padding:10px;
+  border:1px solid #ddd;
+  border-radius:8px;
+  width:94%;
+}
+
+textarea {
+  grid-column:span 2;
+}
+
+/* LIST */
+.list {
+  background:#fff;
+  padding:10px;
+  border-radius:10px;
+}
+
+/* HIDE */
+.hidden { display:none; }
+
+/* BTN */
+.btn {
+  width:100%;
+  padding:10px;
+  background:var(--primary);
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  margin-top:10px;
+  cursor:pointer;
+}
+
+/* NAV */
+nav {
+  position:fixed;
+  bottom:0;
+  width:100%;
+  background:#111;
+  display:flex;
+  justify-content:space-around;
+  color:#fff;
+  padding:10px;
+}
+
+nav div {
+  font-size:12px;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <h2>💼 Expenses System</h2>
+</div>
+
+<div class="container">
+
+<!-- SWITCH -->
+<div class="switch-box">
+  <button id="btnExpense" class="active">💸 Dépense</button>
+  <button id="btnDebt">📉 Dette</button>
+  <button id="btnLoss">❌ Perte</button>
+</div>
+
+<!-- ================= EXPENSE ================= -->
+<div id="expenseForm" class="form-box">
+  <h3>Dépense</h3>
+
+  <div class="form-grid">
+    <input type="text" id="label" placeholder="Label">
+
+    <select id="category">
+      <option value="salary">Salaire</option>
+      <option value="tax">Taxe</option>
+      <option value="maintenance">Maintenance</option>
+      <option value="rent">Loyer</option>
+      <option value="other">Autre</option>
+    </select>
+
+    <input type="number" id="amount" placeholder="Montant">
+
+    <select id="type">
+      <option value="fixed">Fixe</option>
+      <option value="variable">Variable</option>
+    </select>
+
+    <input type="text" id="relatedTo" placeholder="Lié à">
+
+    <textarea id="note" placeholder="Note"></textarea>
+  </div>
+
+  <button class="btn" id="addExpenseBtn">Ajouter</button>
+</div>
+
+<!-- ================= DEBT ================= -->
+<div id="debtForm" class="form-box hidden">
+  <h3>Dette</h3>
+
+  <div class="form-grid">
+    <select id="debtType">
+      <option value="client">Client</option>
+      <option value="supplier">Fournisseur</option>
+    </select>
+
+    <input type="text" id="debtName" placeholder="Nom">
+
+    <input type="number" id="debtAmount" placeholder="Montant">
+
+    <input type="text" id="debtPhone" placeholder="Téléphone">
+
+    <input type="date" id="debtDueDate">
+
+    <textarea id="debtNote" placeholder="Note"></textarea>
+  </div>
+
+  <button class="btn" id="addDebtBtn">Créer dette</button>
+</div>
+
+<!-- ================= LOSS ================= -->
+<div id="lossForm" class="form-box hidden">
+
+  <h3>📦 Perte produit</h3>
+
+  <select id="productSelect"></select>
+  <input type="number" id="productQuantityLost" placeholder="Quantité">
+
+  <select id="productLossReason">
+    <option value="loss">Perte</option>
+    <option value="break">Casse</option>
+    <option value="stock_error">Erreur stock</option>
+  </select>
+
+  <button class="btn" id="submitProductLoss">Valider produit</button>
+
+  <hr style="margin:15px 0">
+
+  <h3>💰 Perte argent</h3>
+
+  <input type="number" id="moneyLostAmount">
+
+  <select id="moneyLossReason">
+    <option value="vol">Vol</option>
+    <option value="faux_billet">Faux billet</option>
+    <option value="erreur_caisse">Erreur caisse</option>
+    <option value="other">Autre</option>
+  </select>
+
+  <button class="btn" id="submitMoneyLoss">Valider argent</button>
+</div>
+
+<!-- FILTERS -->
+<div class="form-box">
+  <input type="text" id="searchInput" placeholder="🔍 recherche...">
+
+  <select id="filterCategory">
+    <option value="all">Tout</option>
+    <option value="salary">Salaire</option>
+    <option value="tax">Taxe</option>
+    <option value="maintenance">Maintenance</option>
+    <option value="rent">Loyer</option>
+    <option value="other">Autre</option>
+  </select>
+
+  <input type="date" id="startDate">
+  <input type="date" id="endDate">
+</div>
+
+<!-- LIST -->
+<div class="list" id="expensesList"></div>
+
+</div>
+
+<!-- NAV -->
+<nav>
+  <div>Vente</div>
+  <div>Produits</div>
+  <div>Stats</div>
+  <div>Dépenses</div>
+</nav>
+
+<script>
+const buttons = {
+  expense: document.getElementById("btnExpense"),
+  debt: document.getElementById("btnDebt"),
+  loss: document.getElementById("btnLoss"),
+};
+
+const forms = {
+  expense: document.getElementById("expenseForm"),
+  debt: document.getElementById("debtForm"),
+  loss: document.getElementById("lossForm"),
+};
+
+function showForm(type) {
+
+  Object.values(forms).forEach(f => f.classList.add("hidden"));
+  Object.values(buttons).forEach(b => b.classList.remove("active"));
+
+  forms[type].classList.remove("hidden");
+  buttons[type].classList.add("active");
+}
+
+// events propres
+buttons.expense.onclick = () => showForm("expense");
+buttons.debt.onclick = () => showForm("debt");
+buttons.loss.onclick = () => showForm("loss");
+</script>
+
+<script type="module" src="js/expensess.js"></script>
+
+</body>
+</html>
