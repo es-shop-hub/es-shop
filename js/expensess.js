@@ -33,6 +33,15 @@ const btnDebt = document.getElementById("addDebtBtn");
 const btnProductLoss = document.getElementById("submitProductLoss");
 const btnMoneyLoss = document.getElementById("submitMoneyLoss");
 
+function debug(msg) {
+  const box = document.getElementById("debug");
+  if (!box) return;
+
+  box.textContent = msg;
+
+  setTimeout(() => box.textContent = "", 5000);
+}
+
 // ================= PRODUCTS =================
 async function loadProducts() {
   const snap = await getDocs(collection(db, "products"));
@@ -83,7 +92,7 @@ function getFiltered() {
       filterCategory.value === "all" ||
       e.category === filterCategory.value;
 
-    const date = e.createdAt?.toDate?.();
+    const date = e.createdAt?.toDate ? e.createdAt.toDate() : null;
 
     const matchDate =
       (!startDate.value || date >= new Date(startDate.value)) &&
@@ -206,6 +215,8 @@ btnExpense.addEventListener("click", async () => {
     updatedAt: Timestamp.now(),
     createdBy: currentUserId
   });
+  
+  debug(" dépense enregistré");
 
   loadData();
 });
@@ -235,50 +246,53 @@ btnDebt.addEventListener("click", async () => {
     updatedAt: Timestamp.now(),
     createdBy: currentUserId
   });
+  
+  debug(" dette enregistré");
 
   loadData();
 });
 
 // ================= LOSS PRODUCT =================
 btnProductLoss.addEventListener("click", async () => {
-  const productId = document.getElementById("productSelect").value;
-  const qtyLost = Number(document.getElementById("productQuantityLost").value);
-  const reason = document.getElementById("productLossReason").value;
+  try {
 
-  if (!productId || qtyLost <= 0) return alert("Produit invalide");
+    const productId = document.getElementById("productSelect").value;
+    const qtyLost = Number(document.getElementById("productQuantityLost").value);
+    const reason = document.getElementById("productLossReason").value;
 
-  const product = allProducts.find(p => p.id === productId);
-  if (!product) return alert("Produit introuvable");
+    if (!productId || qtyLost <= 0) return alert("Produit invalide");
 
-  // 1. expense record
-  await addDoc(collection(db, "expensess"), {
-    genre: "loss",
-    reason,
-    category: "product_loss",
-    amount: 0,
-    type: "variable",
-    relatedTo: productId,
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
-    createdBy: currentUserId
-  });
+    const product = allProducts.find(p => p.id === productId);
+    if (!product) return alert("Produit introuvable");
 
-  // 2. stock update SAFE
-  await updateDoc(doc(db, "products", productId), {
-    stock_current: Math.max(0, product.stock_current - qtyLost)
-  });
+    const currentStock = Number(product.stock_current || 0);
+    const newStock = Math.max(0, currentStock - qtyLost);
 
-  /* 3. stock movement (IMPORTANT)
-  await addStockMovement({
-    productId,
-    type: "OUT",
-    quantity: qtyLost,
-    reason: "loss"
-  });
-  */
+    await addDoc(collection(db, "expensess"), {
+      genre: "loss",
+      reason,
+      category: "product_loss",
+      amount: 0,
+      relatedTo: productId,
+      createdAt: Timestamp.now(),
+      createdBy: currentUserId
+    });
 
-  loadProducts();
-  loadData();
+    await updateDoc(doc(db, "products", productId), {
+      stock_current: newStock
+    });
+
+    loadProducts();
+    loadData();
+    
+    debug(`OK LOSS: ${productId} | -${qtyLost} | stock=${newStock}`);
+    console.log("OK LOSS:", { productId, qtyLost, newStock });
+
+  } catch (err) {
+    console.error("LOSS ERROR:", err);
+    debug(`LOSS ERROR: ${err.message || err}`);
+    alert("Erreur perte produit");
+  }
 });
 
 // ================= LOSS MONEY =================
@@ -298,6 +312,8 @@ btnMoneyLoss.addEventListener("click", async () => {
     updatedAt: Timestamp.now(),
     createdBy: currentUserId
   });
+  
+  debug(" perte ARGENT enregistré");
 
   loadData();
 });
