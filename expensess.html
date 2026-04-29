@@ -256,31 +256,34 @@ nav div {
 </nav>
 
 <script>
-const buttons = {
-  expense: document.getElementById("btnExpense"),
-  debt: document.getElementById("btnDebt"),
-  loss: document.getElementById("btnLoss"),
-};
+document.addEventListener("DOMContentLoaded", () => {
 
-const forms = {
-  expense: document.getElementById("expenseForm"),
-  debt: document.getElementById("debtForm"),
-  loss: document.getElementById("lossForm"),
-};
+  const buttons = {
+    expense: document.getElementById("btnExpense"),
+    debt: document.getElementById("btnDebt"),
+    loss: document.getElementById("btnLoss"),
+  };
 
-function showForm(type) {
+  const forms = {
+    expense: document.getElementById("expenseForm"),
+    debt: document.getElementById("debtForm"),
+    loss: document.getElementById("lossForm"),
+  };
 
-  Object.values(forms).forEach(f => f.classList.add("hidden"));
-  Object.values(buttons).forEach(b => b.classList.remove("active"));
+  function showForm(type) {
+    Object.values(forms).forEach(f => f.classList.add("hidden"));
+    Object.values(buttons).forEach(b => b.classList.remove("active"));
 
-  forms[type].classList.remove("hidden");
-  buttons[type].classList.add("active");
-}
+    forms[type].classList.remove("hidden");
+    buttons[type].classList.add("active");
+  }
 
-// events propres
-buttons.expense.onclick = () => showForm("expense");
-buttons.debt.onclick = () => showForm("debt");
-buttons.loss.onclick = () => showForm("loss");
+  // ✅ UNE SEULE MÉTHODE → addEventListener
+  buttons.expense.addEventListener("click", () => showForm("expense"));
+  buttons.debt.addEventListener("click", () => showForm("debt"));
+  buttons.loss.addEventListener("click", () => showForm("loss"));
+
+});
 </script>
 
 <script type="module">
