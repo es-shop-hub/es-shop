@@ -13,117 +13,59 @@
   padding:0;
 }
 
-html, body{
-  height:100%;
-  overflow:hidden;
-  font-family: Arial, sans-serif;
-  background:#f5f7fa;
-}
-
 /* BODY */
 body{
-  padding:14px;
-  padding-bottom:70px;
+  font-family: Arial, sans-serif;
+  background:#f5f7fa;
+  padding:20px;
+  padding-bottom:80px; /* 🔥 espace pour nav */
+  overflow-y:auto;
 }
 
 /* TITRE */
 h2{
-  font-size:16px;
-  margin-bottom:10px;
+  margin-bottom:15px;
 }
 
-/* GRID PRINCIPAL */
+/* GRID SCROLLABLE */
 .grid{
   display:grid;
-
-  /* 3 colonnes fixes */
-  grid-template-columns: repeat(3, 1fr);
-
-  /* 4 lignes fixes = 12 cards */
-  grid-template-rows: repeat(4, minmax(0, 1fr));
-
-  height: calc(85vh - 110px);
-
-  gap:4px;
-
-  overflow:hidden;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:10px;
 }
 
-/* CARD ULTRA COMPACTE */
+/* CARD */
 .card{
   background:white;
-
-  padding:4px;
-
-  border-radius:6px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.08);
-
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-
-  overflow:hidden;
-
-  min-height:0;
-  min-width:0;
+  padding:15px;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
 }
 
-/* TEXTE FORCÉ ULTRA SMALL */
-.card small{
-  font-size:8%;
-  line-height:1;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.card .big{
-  font-size:10px; /* ↓ réduction réelle */
-  font-weight:500;
-  line-height:1;
-
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-
-  /* 🔥 AJOUT CRUCIAL */
-  max-width:96%;
-  display:block;
+/* TEXT */
+.big{
+  font-size:22px;
+  font-weight:bold;
 }
 
-
-/* FORCE SHRINK GLOBAL */
-.grid > .card,
-.card > *{
-  min-width:0;
-  min-height:0;
-}
-.card small{
-  font-size:5px; /* ↓ encore plus compact */
-  line-height:1;
-
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-
-  max-width:100%;
+small{
+  color:#666;
 }
 
 /* DEBUG */
 #debug{
-  font-size:11px;
+  margin-bottom:10px;
   color:red;
-  margin-bottom:6px;
+  font-size:13px;
 }
 
-/* NAV FIXE */
+/* 🔥 NAV FIXED (NE SCROLL PAS) */
 nav{
   position:fixed;
   bottom:0;
   left:0;
-
   width:100%;
-  height:60px;
+  height:65px;
 
   background:#111;
   display:flex;
@@ -136,19 +78,21 @@ nav{
   border-top:1px solid rgba(255,255,255,0.1);
 }
 
+/* NAV ITEMS */
 nav .nav-item{
   flex:1;
   text-align:center;
-  font-size:10px;
+  font-size:11px;
   cursor:pointer;
 }
 
+/* ACTIVE */
 nav .nav-item.active{
   color:#D4AF37;
   font-weight:bold;
 }
 
-/* NO SCROLL ANYWHERE */
+/* 🔥 Empêche tout scroll horizontal */
 html, body{
   overflow-x:hidden;
 }
@@ -173,45 +117,15 @@ html, body{
     <small>💰 Chiffre d'affaires</small>
     <div class="big" id="sales">0</div>
   </div>
-  
-  <div class="card">
-  <small>💵 Cash Flow</small>
-  <div class="big" id="cashFlow">0</div>
-  <small>💵 Reel Cash</small>
-  <div class="big" id="realCash">0</div>
-</div>
-
-
-<div class="card">
-  <small>📩 Capital externe</small>
-  <div class="big" id="externalValue">0</div>
-</div>
 
   <div class="card">
-  <small>🧠 Profit idéal</small>
-  <div class="big" id="idealProfit">0</div>
     <small>📈 Profit net</small>
     <div class="big" id="profit">0</div>
   </div>
-  
-  <div class="card">
-  <small>🔁 Taux réinvestissement</small>
-  <div class="big" id="reinvestRate">0%</div>
-</div>
 
   <div class="card">
     <small>💸 Dépenses</small>
     <div class="big" id="expenses">0</div>
-  </div>
-  
-  <div class="card">
-    <small>🔐 Dettes</small>
-    <div class="big" id="debts">0</div>
-  </div>
-  
-  <div class="card">
-    <small>❌ Pertes</small>
-    <div class="big" id="losses">0</div>
   </div>
 
   <div class="card">
@@ -256,10 +170,7 @@ import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 import html2canvas from "https://esm.sh/html2canvas@1.4.1";
 
 const el = (id) => document.getElementById(id);
-const n = (v) => {
-  const x = Number(v);
-  return isNaN(x) ? 0 : x;
-};
+const n = (v) => Number(v) || 0;
 
 /* =========================
    DEBUG
@@ -271,11 +182,6 @@ function debug(msg) {
   if (!box) return;
 
   box.textContent = msg;
-
-  // 🔥 force repaint immédiat
-  box.style.display = "none";
-  box.offsetHeight; // reflow hack
-  box.style.display = "block";
 
   clearTimeout(debugTimer);
   debugTimer = setTimeout(() => {
@@ -293,17 +199,7 @@ let ready = false;
 ========================= */
 const auth = getAuth();
 
-let authResolved = false;
-
-setTimeout(() => {
-  if (!authResolved) {
-    debug("⏳ Auth lente...");
-  }
-}, 2000);
-
 onAuthStateChanged(auth, async (user) => {
-  authResolved = true;
-
   if (!user) {
     location.href = "login.html";
     return;
@@ -319,36 +215,19 @@ onAuthStateChanged(auth, async (user) => {
 async function load() {
   try {
 
-    const [
-  salesSnap,
-  expSnap,
-  stockSnap,
-  prodSnap,
-  invSnap,
-  debtSnap,
-  lossSnap
-] = await Promise.all([
-  getDocs(collection(db, "sales")),
-  getDocs(collection(db, "expenses")),
-  getDocs(collection(db, "stock_movements")),
-  getDocs(collection(db, "products")),
-  getDocs(collection(db, "investments")),
-  getDocs(collection(db, "debts")),
-  getDocs(collection(db, "losses"))
-]);
-
-const investments = invSnap.docs.map(d => d.data() || {});
+    const [salesSnap, expSnap, stockSnap, prodSnap] = await Promise.all([
+      getDocs(collection(db, "sales")),
+      getDocs(collection(db, "expenses")),
+      getDocs(collection(db, "stock_movements")),
+      getDocs(collection(db, "products"))
+    ]);
 
     const sales = salesSnap.docs.map(d => d.data() || {});
     const expenses = expSnap.docs.map(d => d.data() || {});
     const stock = stockSnap.docs.map(d => d.data() || {});
-    const products = prodSnap.docs.map(d => ({
-  ...d.data()
-}));
-    const debts = debtSnap.docs.map(d => d.data() || {});
-    const losses = lossSnap.docs.map(d => d.data() || {});
+    const products = prodSnap.docs.map(d => d.data() || {});
 
-    render(sales, expenses, stock, products, investments, debts, losses);
+    render(sales, expenses, stock, products);
 
     ready = true;
     el("pdfBtn").disabled = false;
@@ -363,14 +242,7 @@ const investments = invSnap.docs.map(d => d.data() || {});
 /* =========================
    RENDER
 ========================= */
-function render(sales, expenses, stock, products, investments, debts, losses) {
-    sales = Array.isArray(sales) ? sales : [];
-expenses = Array.isArray(expenses) ? expenses : [];
-stock = Array.isArray(stock) ? stock : [];
-products = Array.isArray(products) ? products : [];
-investments = Array.isArray(investments) ? investments : [];
-debts = Array.isArray(debts) ? debts : [];
-losses = Array.isArray(losses) ? losses : [];
+function render(sales, expenses, stock, products) {
 
     const stockValue = products.reduce((total, p) => {
 
@@ -381,46 +253,17 @@ losses = Array.isArray(losses) ? losses : [];
 
 }, 0);
 
-const totalSales = sales.reduce((a, s) =>
-  a + n(s.total_amount || s.amount || s.amount_total)
-, 0);
+  const totalSales = sales.reduce((a, s) =>
+    a + n(s.total_amount || s.amount || s.amount_total)
+  , 0);
 
-const totalDebts = debts.reduce((a, d) =>
-  a + n(d.amount_remaining),
-0);
+  const totalProfit = sales.reduce((a, s) =>
+    a + n(s.total_profit || s.profit)
+  , 0);
 
-const totalLosses = losses.reduce((a, l) =>
-  a + n(l.estimated_value),
-0);
-
-const totalExpenses = expenses.reduce((a, e) =>
-  a + n(e.amount)
-, 0);
-
-// 🔥 split propre investments
-const totalReinvested = investments
-  .filter(i => n(i.reinvested) > 0)
-  .reduce((a, i) => a + n(i.reinvested), 0);
-
-const totalExternal = investments
-  .filter(i => n(i.external) > 0)
-  .reduce((a, i) => a + n(i.external), 0);
-
-// 🔥 PROFIT NET PROPRE
-const netProfit = totalSales - totalExpenses - totalReinvested - totalLosses;
-
-// 🔥 cash flow
-const cashFlow = totalSales - totalExpenses;
-const realCash = totalSales - totalExpenses - totalDebts;
-
-// 🔥 profit idéal (sans dépenses ni reinvest)
-const idealProfit = sales.reduce((a, s) =>
-  a + n(s.total_profit || s.profit)
-, 0);
-
-const reinvestRate = totalSales > 0
-  ? (totalReinvested / totalSales) * 100
-  : 0;
+  const totalExpenses = expenses.reduce((a, e) =>
+    a + n(e.amount)
+  , 0);
 
   const stockIn = stock.filter(s => s.type === "IN")
     .reduce((a, s) => a + n(s.quantity), 0);
@@ -430,22 +273,15 @@ const reinvestRate = totalSales > 0
 
   const stockTotal = stockIn - stockOut;
 
+  const netReal = totalSales - totalExpenses;
   
   el("stockValue").textContent = stockValue + " FC";
   el("sales").textContent = totalSales + " FC";
-  el("profit").textContent = netProfit + " FC"; // ✔ vrai profit
+  el("profit").textContent = netReal + " FC"; // ✔ corrigé logique réelle
   el("expenses").textContent = totalExpenses + " FC";
   el("sold").textContent = sales.length;
   el("stockTotal").textContent = stockTotal;
   el("products").textContent = products.length;
-  el("cashFlow").textContent = cashFlow + " FC";
-  el("realCash").textContent = realCash + " FC";
-el("idealProfit").textContent = idealProfit + " FC";
-el("externalValue")?.textContent = totalExternal + " FC";
-el("reinvestRate").textContent = reinvestRate.toFixed(1) + "%";
-
-el("debts").textContent = totalDebts + " FC";
-el("losses").textContent = totalLosses + " FC";
 
   debug("✅ OK");
 }
@@ -477,26 +313,23 @@ el("pdfBtn").addEventListener("click", async () => {
 
     const grid = document.querySelector(".grid");
 
-    // 🔥 CLONE SAFE (ne touche PAS UI)
-    const clone = grid.cloneNode(true);
+    // 🔥 SAUVEGARDE styles actuels
+    const oldWidth = grid.style.width;
+    const oldMaxWidth = grid.style.maxWidth;
 
-    const wrapper = document.createElement("div");
-    wrapper.style.position = "fixed";
-    wrapper.style.left = "-99999px";
-    wrapper.style.top = "0";
-    wrapper.style.width = grid.offsetWidth + "px";
-    wrapper.style.background = "#fff";
+    // 🔥 FIX largeur (clé du problème)
+    grid.style.width = "800px";
+    grid.style.maxWidth = "800px";
 
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
-
-    const canvas = await html2canvas(clone, {
+    const canvas = await html2canvas(grid, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff"
     });
 
-    document.body.removeChild(wrapper);
+    // 🔁 RESTORE (aucune casse UI)
+    grid.style.width = oldWidth;
+    grid.style.maxWidth = oldMaxWidth;
 
     const img = canvas.toDataURL("image/png");
 
@@ -505,18 +338,32 @@ el("pdfBtn").addEventListener("click", async () => {
     const id = generateId();
     const date = formatDate();
 
+    /* HEADER */
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(16);
     pdf.text("Es-Shop Invoice Report", 14, 18);
 
     pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
     pdf.text(`ID: ${id}`, 14, 26);
     pdf.text(`Date: ${date}`, 14, 32);
 
+    /* LOGO */
+    pdf.setDrawColor(200);
+    pdf.rect(160, 10, 35, 20);
+    pdf.setFontSize(8);
+    pdf.text("ES-SHOP", 172, 22);
+
+    /* IMAGE GRID */
     const w = 190;
     const h = (canvas.height * w) / canvas.width;
 
     pdf.addImage(img, "PNG", 10, 40, w, h);
+
+    /* FOOTER */
+    pdf.setFontSize(8);
+    pdf.setTextColor(120);
+    pdf.text("Generated by Es-Shop System", 14, 285);
 
     pdf.save(`es-shop-${id}.pdf`);
 
@@ -527,7 +374,6 @@ el("pdfBtn").addEventListener("click", async () => {
   }
 
 });
-
 </script>
 
 </body>
