@@ -294,6 +294,12 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
+ <script>
+document.querySelectorAll('nav .nav-item').forEach(item => {
+  item.addEventListener('click', () => location.href = item.dataset.page);
+});
+ </script>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
