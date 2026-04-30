@@ -331,6 +331,15 @@ function debug(msg) {
 
   setTimeout(() => box.textContent = "", 5000);
 }
+function setLoading(state) {
+  list.replaceChildren();
+
+  if (state) {
+    const div = document.createElement("div");
+    div.textContent = "⏳ Chargement...";
+    list.appendChild(div);
+  }
+}
 
 // ================= PRODUCTS =================
 async function loadProducts() {
@@ -357,6 +366,8 @@ async function loadProducts() {
 // ================= DATA =================
 async function loadData() {
   try {
+    setLoading(true);
+
     const q = query(collection(db, "expensess"), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
 
@@ -369,15 +380,18 @@ async function loadData() {
     render();
 
   } catch (e) {
-    debug("❌ loadData: " + e.message);
-    console.error(e);
+    console.error("FULL ERROR:", e);
+    debug("❌ loadData: " + (e?.message || e));
+
+  } finally {
+    setLoading(false);
   }
 }
 
 // ================= FILTER =================
 function getFiltered() {
   return allData.filter(e => {
-    const search = searchInput.value.toLowerCase();
+    const search = (searchInput?.value || "").toLowerCase();
 
     const matchSearch =
       !search ||
@@ -621,16 +635,22 @@ startDate.addEventListener("change", () => render(1));
 endDate.addEventListener("change", () => render(1));
 
 // ================= AUTH =================
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async (user) => {
   if (!user) return (location.href = "login.html");
 
   currentUserId = user.uid;
-    
-  debug("⏳ Chargement...");
-  loadProducts();
-  loadData();
+
+  try {
+    setLoading(true);
+    await loadProducts();
+    await loadData();
+    setLoading(false);
+  } catch (e) {
+    console.error(e);
+    debug("❌ ERROR LOAD: " + (e.message || e));
+  }
 });
 </script>
 
 </body>
-</html>
+  </html>
