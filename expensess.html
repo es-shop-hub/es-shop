@@ -181,7 +181,8 @@ nav div {
 
     <input type="text" id="debtName" placeholder="Nom">
 
-    <input type="number" id="debtAmount" placeholder="Montant">
+    <input type="number" id="debtAmount" placeholder="Montant De dette">
+    <input type="number" id="debtPayed" placeholder="Montant Payer">
 
     <input type="text" id="debtPhone" placeholder="Téléphone">
 
@@ -287,8 +288,10 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 <script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+
 import {
-  db,
+  getFirestore,
   collection,
   addDoc,
   getDocs,
@@ -297,9 +300,22 @@ import {
   query,
   orderBy,
   Timestamp
-} from "./js/firebase.js";
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD8_86DgCqPdwVNy1ww6PPz0TM5lVMWm_s",
+  authDomain: "es-shop-db.firebaseapp.com",
+  projectId: "es-shop-db",
+  storageBucket: "es-shop-db.firebasestorage.app",
+  messagingSenderId: "750093706451",
+  appId: "1:750093706451:web:62f0aa0891d0ed0ed96026",
+  measurementId: "G-TM3YYR5ZH7"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const auth = getAuth();
 
@@ -417,7 +433,6 @@ function render(page = 1) {
   currentPage = page;
 
   const data = getFiltered();
-
   const start = (page - 1) * ITEMS_PER_PAGE;
   const pageData = data.slice(start, start + ITEMS_PER_PAGE);
 
@@ -439,11 +454,24 @@ function render(page = 1) {
     left.appendChild(sub);
 
     const amount = document.createElement("div");
-    amount.textContent = `${item.amount} FC`;
+
+    let displayAmount = 0;
+    if (item.genre === "debt") {
+      displayAmount = item.amount_remaining;
+    } else {
+      displayAmount = item.amount;
+    }
+
+    amount.textContent = `${displayAmount || 0} FC`;
     amount.style.fontWeight = "bold";
+
+    const btn = document.createElement("button");
+    btn.textContent = "Modifier";
+    btn.addEventListener("click", () => modifyFunc(item.id));
 
     div.appendChild(left);
     div.appendChild(amount);
+    div.appendChild(btn);
 
     list.appendChild(div);
   });
@@ -451,19 +479,21 @@ function render(page = 1) {
   renderPagination(data.length);
 }
 
-/* " ================= STOCK MOVEMENT =================
+// ================= STOCK MOVEMENT =================
 async function addStockMovement({ productId, type, quantity, reason, referenceId = null }) {
+  if (!productId || !type || !quantity) return;
+
   await addDoc(collection(db, "stock_movements"), {
     productId,
     type,
     quantity,
-    reason,
+    reason: reason || "unknown",
     referenceId,
     createdBy: currentUserId,
     createdAt: Timestamp.now()
   });
 }
-*/
+
 
 // ================= PAGINATION =================
 function renderPagination(total) {
@@ -511,7 +541,9 @@ btnExpense.addEventListener("click", async () => {
   const relatedTo = document.getElementById("relatedTo").value;
   const note = document.getElementById("note").value;
 
-  if (!label || !amount) return alert("Champs obligatoires");
+  if (!label || isNaN(amount) || amount <= 0) {
+    return alert("Montant invalide");
+  }
 
   await addDoc(collection(db, "expensess"), {
     genre: "expense",
@@ -525,9 +557,8 @@ btnExpense.addEventListener("click", async () => {
     updatedAt: Timestamp.now(),
     createdBy: currentUserId
   });
-  
-  debug(" dépense enregistré");
 
+  debug("dépense enregistrée");
   loadData();
 });
 
@@ -535,30 +566,36 @@ btnExpense.addEventListener("click", async () => {
 btnDebt.addEventListener("click", async () => {
   const type = document.getElementById("debtType").value;
   const name = document.getElementById("debtName").value;
-  const amount = Number(document.getElementById("debtAmount").value);
-  const phone = document.getElementById("debtPhone").value;
-  const dueDate = document.getElementById("debtDueDate").value;
+  const total = Number(document.getElementById("debtAmount").value);
+  const paid = Number(document.getElementById("debtPayed").value);
   const note = document.getElementById("debtNote").value;
 
-  if (!name || !amount) return alert("Champs obligatoires");
+  if (!name || isNaN(total) || total <= 0) {
+    return alert("Champs obligatoires");
+  }
+
+  const safePaid = isNaN(paid) ? 0 : paid;
+  const remaining = total - safePaid;
 
   await addDoc(collection(db, "expensess"), {
     genre: "debt",
     reason: `${type} debt`,
     category: "debt",
-    amount,
-    type: "variable",
+
+    amount_total: total,
+    amount_paid: safePaid,
+    amount_remaining: remaining,
+    status: remaining > 0 ? "partial" : "paid",
+
     relatedTo: name,
-    phone: phone || null,
-    dueDate: dueDate || null,
-    note,
+    note: note || "",
+
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
     createdBy: currentUserId
   });
-  
-  debug(" dette enregistré");
 
+  debug("dette enregistrée");
   loadData();
 });
 
@@ -578,15 +615,26 @@ btnProductLoss.addEventListener("click", async () => {
     const currentStock = Number(product.stock_current || 0);
     const newStock = Math.max(0, currentStock - qtyLost);
 
-    await addDoc(collection(db, "expensess"), {
-      genre: "loss",
-      reason,
-      category: "product_loss",
-      amount: 0,
-      relatedTo: productId,
-      createdAt: Timestamp.now(),
-      createdBy: currentUserId
-    });
+    const priceBuy = Number(product.price_buy || 0);
+
+const ref = await addDoc(collection(db, "expensess"), {
+  genre: "loss",
+  reason,
+  category: "product_loss",
+  amount: qtyLost * priceBuy,
+  relatedTo: productId,
+  createdAt: Timestamp.now(),
+  updatedAt: Timestamp.now(),
+  createdBy: currentUserId
+});
+
+await addStockMovement({
+  productId,
+  type: "OUT",
+  quantity: qtyLost,
+  reason: "loss",
+  referenceId: ref.id
+});
 
     await updateDoc(doc(db, "products", productId), {
       stock_current: newStock
@@ -610,23 +658,113 @@ btnMoneyLoss.addEventListener("click", async () => {
   const amount = Number(document.getElementById("moneyLostAmount").value);
   const reason = document.getElementById("moneyLossReason").value;
 
-  if (!amount) return alert("Montant requis");
+  if (isNaN(amount) || amount <= 0) {
+    return alert("Montant invalide");
+  }
 
   await addDoc(collection(db, "expensess"), {
     genre: "loss",
     reason,
     category: "money_loss",
     amount,
-    type: "variable",
+    type: "fixed",
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
     createdBy: currentUserId
   });
-  
-  debug(" perte ARGENT enregistré");
 
+  debug("perte argent enregistrée");
   loadData();
 });
+
+// =============== MODIFICATION ===============
+async function modifyFunc(id){
+  if(!currentUserId){
+    alert("Non autorisé");
+    return;
+  }
+
+  const item = allData.find(e => e.id === id);
+  if (!item) return;
+
+  // ================= LOSS =================
+  if(item.genre === "loss"){
+    const qty = Number(prompt("Quantité à corriger (+ uniquement)"));
+
+    if(isNaN(qty) || qty <= 0) return;
+
+    const productId = item.relatedTo;
+    const product = allProducts.find(p => p.id === productId);
+    if (!product) return alert("Produit introuvable");
+
+    // mouvement inverse
+    await addDoc(collection(db, "stock_movements"), {
+      productId,
+      type: "IN",
+      quantity: qty,
+      reason: "correction_loss",
+      referenceId: id,
+      createdBy: currentUserId,
+      createdAt: Timestamp.now()
+    });
+
+    // update stock cache
+    await updateDoc(doc(db, "products", productId), {
+      stock_current: Number(product.stock_current || 0) + qty
+    });
+
+    debug("Correction perte OK");
+
+    await loadProducts();
+    await loadData();
+  }
+
+  // ================= EXPENSE =================
+  else if(item.genre === "expense"){
+    const newAmount = Number(prompt("Nouveau montant"));
+
+    if(isNaN(newAmount) || newAmount <= 0) return;
+
+    await updateDoc(doc(db, "expensess", id), {
+      amount: newAmount,
+      updatedAt: Timestamp.now()
+    });
+
+    debug("Dépense modifiée");
+
+    await loadData();
+  }
+
+  // ================= DEBT =================
+  else if(item.genre === "debt"){
+    const pay = Number(prompt("Montant payé"));
+
+    if(isNaN(pay) || pay <= 0) return;
+
+    const currentPaid = Number(item.amount_paid || 0);
+    const total = Number(item.amount_total || 0);
+
+    const newPaid = currentPaid + pay;
+
+    if(newPaid > total){
+      alert("Paiement dépasse la dette");
+      return;
+    }
+
+    const remaining = total - newPaid;
+
+    await updateDoc(doc(db, "expensess", id), {
+      amount_paid: newPaid,
+      amount_remaining: remaining,
+      status: remaining > 0 ? "partial" : "paid",
+      updatedAt: Timestamp.now()
+    });
+
+    debug("Paiement ajouté");
+
+    await loadData();
+  }
+}
 
 // ================= EVENTS =================
 searchInput.addEventListener("input", () => render(1));
