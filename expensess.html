@@ -106,20 +106,25 @@ textarea {
 
 /* NAV */
 nav {
-  position:fixed;
-  bottom:0;
-  width:100%;
-  background:#111;
-  display:flex;
-  justify-content:space-around;
-  color:#fff;
-  padding:10px;
-}
-
-nav div {
-  font-size:12px;
-  cursor:pointer;
-}
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background: #111;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 0;
+      color: white;
+      z-index: 1000;
+    }
+    nav div {
+      text-align: center;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    nav div.active {
+      color: #D4AF37;
+      font-weight: bold;
+  }
 </style>
 </head>
 
