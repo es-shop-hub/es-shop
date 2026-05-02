@@ -3,229 +3,563 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stats Pro</title>
+<title>Es-Shop Stats</title>
 
 <style>
-:root {
-  --bg:#0f172a;
-  --card:#1e293b;
-  --text:#e2e8f0;
-  --muted:#94a3b8;
-  --green:#22c55e;
-  --red:#ef4444;
-}
-
-body{
+/* RESET */
+*{
+  box-sizing:border-box;
   margin:0;
-  font-family:system-ui;
-  background:var(--bg);
-  color:var(--text);
+  padding:0;
 }
 
-header{
+/* BODY */
+body{
+  font-family: Arial, sans-serif;
+  background:#f5f7fa;
   padding:20px;
-  font-size:18px;
-  border-bottom:1px solid #334155;
+  padding-bottom:80px; /* 🔥 espace pour nav */
+  overflow-y:auto;
 }
 
-section{
-  padding:20px;
-}
-
+/* TITRE */
 h2{
-  margin:0 0 10px;
-  color:var(--muted);
+  margin-bottom:15px;
 }
 
+/* GRID SCROLLABLE */
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
   gap:10px;
 }
 
+/* CARD */
 .card{
-  background:var(--card);
-  padding:12px;
+  background:white;
+  padding:15px;
   border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
 }
 
-.value{
-  font-size:18px;
+/* TEXT */
+.big{
+  font-size:22px;
   font-weight:bold;
-  margin-top:5px;
 }
 
-.green{color:var(--green);}
-.red{color:var(--red);}
+small{
+  color:#666;
+}
+
+/* DEBUG */
+#debug{
+  margin-bottom:10px;
+  color:red;
+  font-size:13px;
+}
+
+.kpi{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:6px 0;
+  border-bottom:1px solid rgba(0,0,0,0.05);
+}
+
+.kpi:last-child{
+  border-bottom:none;
+}
+
+.kpi-label{
+  font-size:13px;
+  color:#444;
+}
+
+/* 🔥 NAV FIXED (NE SCROLL PAS) */
+nav{
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:65px;
+
+  background:#111;
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+
+  color:white;
+  z-index:9999;
+
+  border-top:1px solid rgba(255,255,255,0.1);
+}
+
+/* NAV ITEMS */
+nav .nav-item{
+  flex:1;
+  text-align:center;
+  font-size:11px;
+  cursor:pointer;
+}
+
+/* ACTIVE */
+nav .nav-item.active{
+  color:#D4AF37;
+  font-weight:bold;
+}
+
+/* 🔥 Empêche tout scroll horizontal */
+html, body{
+  overflow-x:hidden;
+}
+.chart{
+  background:white;
+  padding:15px;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
+  margin-bottom:15px;
+}
+
+#chart{
+  width:100%;
+  height:120px;
+}
 </style>
 </head>
 
 <body>
 
-<header>📊 Stats Business (Live Firebase)</header>
-<div id="app">Chargement...</div>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import {
-  getFirestore,
-  collection,
-  getDocs
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+<h2>📊 Es-Shop Global Dashboard</h2>
+<button id="pdfBtn" style="margin-bottom:15px;padding:10px 15px;border:none;background:#0B5FFF;color:white;border-radius:6px;cursor:pointer;">
+  📄 Télécharger PDF
+</button>
+<div id="debug" style="margin-bottom:10px;color:red;font-size:13px;"></div>
 
-import {
-  getAuth,
-  signInAnonymously,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-/* ================= FIREBASE ================= */
-const firebaseConfig = {
-  apiKey: "AIzaSyD8_86DgCqPdwVNy1ww6PPz0TM5lVMm_s",
-  authDomain: "es-shop-db.firebaseapp.com",
-  projectId: "es-shop-db",
-};
+<div class="grid">
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-/* ================= AUTH ================= */
-await signInAnonymously(auth);
-
-/* ================= HELPERS ================= */
-const now = new Date();
-
-const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const startOfWeek = d => {
-  const date = new Date(d);
-  const day = date.getDay() || 7;
-  date.setDate(date.getDate() - (day - 1));
-  return startOfDay(date);
-};
-const startOfMonth = d => new Date(d.getFullYear(), d.getMonth(), 1);
-const startOfYear = d => new Date(d.getFullYear(), 0, 1);
-
-const toDate = t => {
-  if (!t) return null;
-  if (t?.toDate) return t.toDate();
-  if (t?.seconds) return new Date(t.seconds * 1000);
-  const d = new Date(t);
-  return isNaN(d) ? null : d;
-};
-
-const money = v => (v || 0).toFixed(2) + " FC";
-
-/* ================= FIRESTORE ================= */
-async function getAll(col){
-  const snap = await getDocs(collection(db,col));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-function filter(data,start,end){
-  return data.filter(d=>{
-    const date = toDate(d.createdAt);
-    if(!date) return true;
-    return date >= start && date <= end;
-  });
-}
-
-/* ================= CALC ================= */
-function compute({sales, sale_items, expenses, debts}){
-  const total_sales = sales.reduce((a,s)=>a+(s.total_amount||0),0);
-  const total_profit = sales.reduce((a,s)=>a+(s.total_profit||0),0);
-  const total_expenses = expenses.reduce((a,e)=>a+(e.amount||0),0);
-  const debts_remaining = debts.reduce((a,d)=>a+(d.amount_remaining||0),0);
-
-  return {
-    total_sales,
-    total_profit,
-    total_expenses,
-    debts_remaining,
-    real_cash: total_sales - debts_remaining,
-    net: total_profit - total_expenses,
-    nb_sales: sales.length,
-    products_sold: sale_items.reduce((a,i)=>a+(i.quantity||0),0),
-    panier: sales.length ? total_sales / sales.length : 0
-  };
-}
-
-/* ================= UI ================= */
-function card(t,v,c=""){
-  return `
     <div class="card">
-      <div>${t}</div>
-      <div class="value ${c}">${v}</div>
-    </div>
-  `;
+  <small>📦 Valeur du stock</small>
+  <div class="big" id="stockValue">0</div>
+</div>
+
+  <div class="card">
+    <small>💰 Chiffre d'affaires</small>
+    <div class="big" id="sales">0</div>
+  </div>
+  
+   <div class="card">
+    <small>⚡ Profit Ideal</small>
+    <div class="big" id="profitIdeal">0</div>
+  </div>
+
+  <div class="card">
+    <small>📈 Profit net</small>
+    <div class="big" id="profit">0</div>
+  </div>
+
+  <div class="card">
+    <small>💸 Dépenses</small>
+    <div class="big" id="expenses">0</div>
+  </div>
+  
+  <div class="card">
+    <small>🔐 Dettes</small>
+    <div class="big" id="debts">0</div>
+  </div>
+  
+  <div class="card">
+    <small>❌ Pertes</small>
+    <div class="big" id="losses">0</div>
+  </div>
+
+  <div class="card">
+    <small>📦 Produits vendus</small>
+    <div class="big" id="sold">0</div>
+  </div>
+
+  <div class="card">
+    <small>📊 Stock total (actuel)</small>
+    <div class="big" id="stockTotal">0</div>
+  </div>
+
+  <div class="card">
+    <small>📦 Nombre de produits</small>
+    <div class="big" id="products">0</div>
+  </div>
+  
+  <div class="card">
+  <h3>💰 Chiffre d'affaires périodique</h3>
+
+  <div class="kpi">
+    <span class="kpi-label">💰 CA du jour</span>
+    <span class="big" id="caToday">0</span>
+  </div>
+
+  <div class="kpi">
+    <span class="kpi-label">💰 CA de la semaine</span>
+    <span class="big" id="caWeek">0</span>
+  </div>
+
+  <div class="kpi">
+    <span class="kpi-label">💰 CA du mois</span>
+    <span class="big" id="caMonth">0</span>
+  </div>
+
+  <div class="kpi">
+    <span class="kpi-label">💰 CA de l'année</span>
+    <span class="big" id="caYear">0</span>
+  </div>
+</div>
+
+<div class="chart">
+<canvas id="chart" height="100"></canvas>
+</div>
+
+</div>
+
+<nav>
+  <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
+  <div class="nav-item" data-page="products.html">📦 Produits</div>
+  <div class="nav-item" data-page="stats.html">📊 Stats</div>
+  <div class="nav-item" data-page="pages.html">🔗 navigation</div>
+  <div class="nav-item active" data-page="stats.html">📥 Loader</div>
+  <div class="nav-item" data-page="losses.html">❌ Pertes</div>
+</nav>
+
+<script>
+document.querySelectorAll('nav .nav-item').forEach(item => {
+  item.addEventListener('click', () => location.href = item.dataset.page);
+});
+
+</script>
+
+<script type="module">
+import { db } from "./js/firebase.js";
+import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
+import html2canvas from "https://esm.sh/html2canvas@1.4.1";
+
+const el = (id) => document.getElementById(id);
+const n = (v) => Number(v) || 0;
+
+/* =========================
+   DEBUG
+========================= */
+let debugTimer;
+
+function debug(msg) {
+  const box = el("debug");
+  if (!box) return;
+
+  box.textContent = msg;
+
+  clearTimeout(debugTimer);
+  debugTimer = setTimeout(() => {
+    box.textContent = "";
+  }, 60000);
 }
 
-function block(title,s){
-  return `
-    <section>
-      <h2>${title}</h2>
-      <div class="grid">
-        ${card("Ventes", money(s.total_sales))}
-        ${card("Profit", money(s.total_profit),"green")}
-        ${card("Dépenses", money(s.total_expenses),"red")}
-        ${card("Dettes", money(s.debts_remaining),"red")}
-        ${card("Cash réel", money(s.real_cash))}
-        ${card("Net", money(s.net), s.net>=0?"green":"red")}
-        ${card("Nb ventes", s.nb_sales)}
-        ${card("Produits", s.products_sold)}
-        ${card("Panier", money(s.panier))}
-      </div>
-    </section>
-  `;
-}
+/* =========================
+   STATE
+========================= */
+let ready = false;
 
-/* ================= MAIN (IMPORTANT) ================= */
+/* =========================
+   AUTH
+========================= */
+const auth = getAuth();
+
 onAuthStateChanged(auth, async (user) => {
-
-  if(!user){
-    document.getElementById("app").innerHTML =
-      "❌ Auth failed";
+  if (!user) {
+    location.href = "login.html";
     return;
   }
 
-  const sales = await getAll("sales");
-  const sale_items = await getAll("sale_items");
-  const expenses = await getAll("expenses");
-  const debts = await getAll("debts");
+  debug("🔄 Chargement...");
+  await load();
+});
 
-  const today = compute({
-    sales: filter(sales,startOfDay(now),now),
-    sale_items,
-    expenses: filter(expenses,startOfDay(now),now),
-    debts: filter(debts,startOfDay(now),now)
+/* =========================
+   LOAD
+========================= */
+async function load() {
+  try {
+
+    const [salesSnap, expSnap, stockSnap, prodSnap] = await Promise.all([
+      getDocs(collection(db, "sales")),
+      getDocs(collection(db, "expensess")),
+      getDocs(collection(db, "stock_movements")),
+      getDocs(collection(db, "products"))
+    ]);
+
+    const sales = salesSnap.docs.map(d => d.data() || {});
+    const expenses = expSnap.docs.map(d => d.data() || {});
+    const stock = stockSnap.docs.map(d => d.data() || {});
+    const products = prodSnap.docs.map(d => d.data() || {});
+
+    render(sales, expenses, stock, products);
+
+    ready = true;
+    el("pdfBtn").disabled = false;
+
+    debug("✅ Dashboard prêt");
+
+  } catch (e) {
+    debug("❌ " + e.message);
+  }
+}
+
+/* =========================
+   TEMPORARILY 
+========================= */
+function isToday(date){
+  const d = new Date(date);
+  const now = new Date();
+  return d.toDateString() === now.toDateString();
+}
+
+function isThisWeek(date){
+  const d = new Date(date);
+  const now = new Date();
+
+  const first = new Date(now.setDate(now.getDate() - now.getDay()));
+  const last = new Date(first);
+  last.setDate(first.getDate() + 6);
+
+  return d >= first && d <= last;
+}
+
+function isThisMonth(date){
+  const d = new Date(date);
+  const now = new Date();
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+function isThisYear(date){
+  const d = new Date(date);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear();
+}
+
+
+function drawChart(data){
+  const canvas = document.getElementById("chart");
+  const ctx = canvas.getContext("2d");
+
+  const keys = Object.keys(data).sort();
+  const values = keys.map(k => data[k]);
+
+  const max = Math.max(...values, 1);
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0,0,w,h);
+
+  const stepX = keys.length ? w / keys.length : 1;
+
+  ctx.beginPath();
+
+  values.forEach((v,i)=>{
+    const x = i * stepX;
+    const y = h - (v/max)*h;
+
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
   });
 
-  const week = compute({
-    sales: filter(sales,startOfWeek(now),now),
-    sale_items,
-    expenses: filter(expenses,startOfWeek(now),now),
-    debts: filter(debts,startOfWeek(now),now)
-  });
+  ctx.stroke();
+  ctx.strokeStyle = "#0B5FFF";
+  ctx.lineWidth = 2;
+}
 
-  const month = compute({
-    sales: filter(sales,startOfMonth(now),now),
-    sale_items,
-    expenses: filter(expenses,startOfMonth(now),now),
-    debts: filter(debts,startOfMonth(now),now)
-  });
+/* =========================
+   RENDER
+========================= */
+function render(sales, expenses, stock, products) {
 
-  const year = compute({
-    sales: filter(sales,startOfYear(now),now),
-    sale_items,
-    expenses: filter(expenses,startOfYear(now),now),
-    debts: filter(debts,startOfYear(now),now)
-  });
+  const stockValue = products.reduce((total, p) => {
+    return total + (n(p.price_buy) * n(p.stock_current));
+  }, 0);
+  
+  const caToday = sales
+  .filter(s => s.createdAt?.toDate && isToday(s.createdAt.toDate()))
+  .reduce((a,s)=>a+n(s.total_amount),0);
+  
+  const chartData = {};
 
-  document.getElementById("app").innerHTML =
-    block("Aujourd’hui",today) +
-    block("Semaine",week) +
-    block("Mois",month) +
-    block("Année",year);
+sales.forEach(s => {
+  if(!s.createdAt?.toDate) return;
+
+  const d = s.createdAt.toDate();
+  const key = d.toISOString().slice(0,10);
+
+  chartData[key] = (chartData[key] || 0) + n(s.total_amount);
+});
+
+const caWeek = sales
+  .filter(s => s.createdAt?.toDate && isThisWeek(s.createdAt.toDate()))
+  .reduce((a,s)=>a+n(s.total_amount),0);
+
+const caMonth = sales
+  .filter(s => s.createdAt?.toDate && isThisMonth(s.createdAt.toDate()))
+  .reduce((a,s)=>a+n(s.total_amount),0);
+
+const caYear = sales
+  .filter(s => s.createdAt?.toDate && isThisYear(s.createdAt.toDate()))
+  .reduce((a,s)=>a+n(s.total_amount),0);
+
+  const totalSales = sales.reduce((a, s) =>
+    a + n(s.total_amount || s.amount || s.amount_total)
+  , 0);
+
+  const totalProfit = sales.reduce((a, s) =>
+    a + n(s.total_profit || s.profit)
+  , 0);
+
+  // ✅ FILTER PROPRE
+  const totalExpenses = expenses
+    .filter(e => e.genre === "expense")
+    .reduce((a, e) => a + n(e.amount), 0);
+
+  const totalDebts = expenses
+    .filter(e => e.genre === "debt")
+    .reduce((a, e) => a + n(e.amount_remaining), 0);
+
+  const totalLosses = expenses
+    .filter(e => e.genre === "loss")
+    .reduce((a, e) => a + n(e.amount), 0);
+
+  const stockIn = stock
+    .filter(s => s.type === "IN")
+    .reduce((a, s) => a + n(s.quantity), 0);
+
+  const stockOut = stock
+    .filter(s => s.type === "OUT")
+    .reduce((a, s) => a + n(s.quantity), 0);
+
+  const stockTotal = stockIn - stockOut;
+
+  const netReal = totalSales - totalExpenses - totalLosses;
+
+  el("stockValue").textContent = stockValue + " FC";
+  el("sales").textContent = totalSales + " FC";
+  el("profit").textContent = netReal + " FC";
+  el("profitIdeal").textContent = totalProfit + " FC";
+  el("losses").textContent = totalLosses + " FC";
+  el("debts").textContent = totalDebts + " FC"; 
+  el("expenses").textContent = totalExpenses + " FC";
+  el("sold").textContent = sales.length;
+  el("stockTotal").textContent = stockTotal;
+  el("products").textContent = products.length;
+  el("caToday").textContent = caToday + " FC";
+el("caWeek").textContent = caWeek + " FC";
+el("caMonth").textContent = caMonth + " FC";
+el("caYear").textContent = caYear + " FC";
+drawChart(chartData);
+
+  debug("✅ OK");
+}
+
+/* =========================
+   PDF (CLEAN MODULE ONLY)
+========================= */
+el("pdfBtn").disabled = true;
+
+function generateId() {
+  return "dev" + Date.now().toString(36).toUpperCase();
+}
+
+function formatDate() {
+  return new Date().toLocaleString("fr-FR", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+}
+
+el("pdfBtn").addEventListener("click", async () => {
+
+  if (!ready) {
+    debug("⏳ Chargement...");
+    return;
+  }
+
+  try {
+
+    const grid = document.querySelector(".grid");
+    const body = document.body;
+
+    // 🔥 SAVE STATE
+    const oldGridWidth = grid.style.width;
+    const oldGridMax = grid.style.maxWidth;
+    const oldOverflow = body.style.overflow;
+    const oldHeight = body.style.height;
+
+    // 🔥 FORCE FULL VIEW (clé PDF propre)
+    body.style.overflow = "visible";
+    body.style.height = "auto";
+
+    grid.style.width = "1000px";
+    grid.style.maxWidth = "1000px";
+
+    // 🔥 attendre repaint DOM
+    await new Promise(r => requestAnimationFrame(r));
+
+    const canvas = await html2canvas(grid, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      scrollY: 0
+    });
+
+    // 🔁 RESTORE UI
+    grid.style.width = oldGridWidth;
+    grid.style.maxWidth = oldGridMax;
+    body.style.overflow = oldOverflow;
+    body.style.height = oldHeight;
+
+    const img = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const id = generateId();
+    const date = formatDate();
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text("Es-Shop Invoice Report", 14, 18);
+
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`ID: ${id}`, 14, 26);
+    pdf.text(`Date: ${date}`, 14, 32);
+
+    pdf.setDrawColor(200);
+    pdf.rect(160, 10, 35, 20);
+    pdf.text("ES-SHOP", 172, 22);
+
+    const w = 190;
+    const h = (canvas.height * w) / canvas.width;
+
+    pdf.addImage(img, "PNG", 10, 40, w, h);
+
+    pdf.setFontSize(8);
+    pdf.setTextColor(120);
+    pdf.text("Generated by Es-Shop System", 14, 285);
+
+    pdf.save(`es-shop-${id}.pdf`);
+
+    debug("📄 PDF généré");
+
+  } catch (e) {
+    debug("❌ PDF: " + e.message);
+  }
+
 });
 </script>
-<</body>
-</html>
+</body>
+  </html>
