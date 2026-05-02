@@ -386,11 +386,31 @@ function render(sales, expenses, stock, products) {
     return total + (n(p.price_buy) * n(p.stock_current));
   }, 0);
   
-  const caToday = sales
-  .filter(s => s.createdAt?.toDate && isToday(s.createdAt.toDate()))
-  .reduce((a,s)=>a+n(s.total_amount),0);
-  
-  const chartData = {};
+  const caToday = sales.reduce((a,s)=>{
+  const d = getDateSafe(s.createdAt);
+  if(!d || !isToday(d)) return a;
+  return a + n(s.total_amount);
+},0);
+
+const caWeek = sales.reduce((a,s)=>{
+  const d = getDateSafe(s.createdAt);
+  if(!d || !isThisWeek(d)) return a;
+  return a + n(s.total_amount);
+},0);
+
+const caMonth = sales.reduce((a,s)=>{
+  const d = getDateSafe(s.createdAt);
+  if(!d || !isThisMonth(d)) return a;
+  return a + n(s.total_amount);
+},0);
+
+const caYear = sales.reduce((a,s)=>{
+  const d = getDateSafe(s.createdAt);
+  if(!d || !isThisYear(d)) return a;
+  return a + n(s.total_amount);
+},0);
+
+const chartData = {};
 
 sales.forEach(s => {
   if(!s.createdAt?.toDate) return;
@@ -400,18 +420,6 @@ sales.forEach(s => {
 
   chartData[key] = (chartData[key] || 0) + n(s.total_amount);
 });
-
-const caWeek = sales
-  .filter(s => s.createdAt?.toDate && isThisWeek(s.createdAt.toDate()))
-  .reduce((a,s)=>a+n(s.total_amount),0);
-
-const caMonth = sales
-  .filter(s => s.createdAt?.toDate && isThisMonth(s.createdAt.toDate()))
-  .reduce((a,s)=>a+n(s.total_amount),0);
-
-const caYear = sales
-  .filter(s => s.createdAt?.toDate && isThisYear(s.createdAt.toDate()))
-  .reduce((a,s)=>a+n(s.total_amount),0);
 
   const totalSales = sales.reduce((a, s) =>
     a + n(s.total_amount || s.amount || s.amount_total)
@@ -562,4 +570,4 @@ el("pdfBtn").addEventListener("click", async () => {
 });
 </script>
 </body>
-  </html>
+      </html>
