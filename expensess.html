@@ -500,33 +500,46 @@ function render(page = 1) {
     const title = document.createElement("strong");
     title.textContent = item.reason || "—";
 
+    // ===== BADGES =====
     const badge = document.createElement("span");
     badge.classList.add("badge");
 
     if(item.genre === "expense"){
       badge.classList.add("badge-expense");
       badge.textContent = "EXPENSE";
+      title.appendChild(badge);
     }
     else if(item.genre === "debt"){
+      // 👉 badge TYPE
+      const badgeType = document.createElement("span");
+      badgeType.classList.add("badge", "badge-debt");
+      badgeType.textContent = "DEBT";
+
+      // 👉 badge STATUS
+      const badgeStatus = document.createElement("span");
+      badgeStatus.classList.add("badge");
+
       if(item.status === "paid"){
-        badge.classList.add("badge-paid");
-        badge.textContent = "PAID";
+        badgeStatus.classList.add("badge-paid");
+        badgeStatus.textContent = "PAID";
       } else {
-        badge.classList.add("badge-partial");
-        badge.textContent = "PARTIAL";
+        badgeStatus.classList.add("badge-partial");
+        badgeStatus.textContent = "PARTIAL";
       }
+
+      title.appendChild(badgeType);
+      title.appendChild(badgeStatus);
     }
     else if(item.genre === "loss"){
       badge.classList.add("badge-loss");
       badge.textContent = "LOSS";
+      title.appendChild(badge);
     }
 
-    title.appendChild(badge); // ✅ UNE SEULE FOIS
-
+    // ===== SUB =====
     const sub = document.createElement("small");
-    let displayAmount = 0;
 
-    let dueText = null; // ✅ éviter append avant ordre
+    let displayAmount = 0;
 
     if (item.genre === "debt") {
       sub.textContent = item.name || "unknown";
@@ -537,10 +550,12 @@ function render(page = 1) {
         const now = new Date();
         const days = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
 
-        dueText = document.createElement("div");
+        const dueText = document.createElement("div");
         dueText.textContent = `⏳ ${days} jours`;
         dueText.style.color = "red";
         dueText.style.fontSize = "12px";
+
+        left.appendChild(dueText);
       }
 
     } else {
@@ -548,10 +563,8 @@ function render(page = 1) {
       displayAmount = item.amount || 0;
     }
 
-    // ✅ ORDRE PROPRE
     left.appendChild(title);
     left.appendChild(sub);
-    if (dueText) left.appendChild(dueText);
 
     const amount = document.createElement("div");
     amount.textContent = `${displayAmount || 0} FC`;
