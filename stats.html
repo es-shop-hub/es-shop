@@ -316,6 +316,15 @@ async function load() {
 /* =========================
    TEMPORARILY 
 ========================= */
+ function getDateSafe(v){
+  if(!v) return null;
+
+  if(v.toDate) return v.toDate(); // Firestore Timestamp
+
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+  }
+  
 function isToday(date){
   const d = new Date(date);
   const now = new Date();
@@ -570,4 +579,4 @@ el("pdfBtn").addEventListener("click", async () => {
 });
 </script>
 </body>
-      </html>
+  </html>
