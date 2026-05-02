@@ -127,7 +127,18 @@ textarea {
   display:block;
   color:#777;
 }
+.badge {
+  font-size:11px;
+  padding:3px 6px;
+  border-radius:6px;
+  color:#fff;
+  margin-left:6px;
+}
 
+.badge-expense { background:#0B5FFF; }
+.badge-debt { background:#e74c3c; }
+.badge-loss { background:#f39c12; }
+  
 /* NAV */
 nav {
       position: fixed;
@@ -485,7 +496,25 @@ function render(page = 1) {
     const left = document.createElement("div");
 
     const title = document.createElement("strong");
-    title.textContent = `${item.reason} (${item.genre})`;
+    title.textContent = item.reason || "—";
+
+const badge = document.createElement("span");
+badge.classList.add("badge");
+
+if(item.genre === "expense"){
+  badge.classList.add("badge-expense");
+  badge.textContent = "EXPENSE";
+}
+else if(item.genre === "debt"){
+  badge.classList.add("badge-debt");
+  badge.textContent = "DEBT";
+}
+else if(item.genre === "loss"){
+  badge.classList.add("badge-loss");
+  badge.textContent = "LOSS";
+}
+
+title.appendChild(badge);
     
     const sub = document.createElement("small");
 
