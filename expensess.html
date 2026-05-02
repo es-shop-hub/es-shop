@@ -104,6 +104,30 @@ textarea {
   cursor:pointer;
 }
 
+/* displayed*/
+.expense-item {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px;
+  border-bottom:1px solid #eee;
+}
+
+.expense-item button {
+  padding:6px 10px;
+  border:none;
+  background:#0B5FFF;
+  color:#fff;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+}
+
+.expense-item small {
+  display:block;
+  color:#777;
+}
+
 /* NAV */
 nav {
       position: fixed;
@@ -124,7 +148,7 @@ nav {
     nav div.active {
       color: #D4AF37;
       font-weight: bold;
-  }
+    }
 </style>
 </head>
 
@@ -153,6 +177,7 @@ nav {
 
     <select id="category">
       <option value="salary">Salaire</option>
+      <option value="reinvestment">Réinvestissement</option>
       <option value="tax">Taxe</option>
       <option value="maintenance">Maintenance</option>
       <option value="rent">Loyer</option>
@@ -252,15 +277,15 @@ nav {
 <div class="list" id="expensesList"></div>
 
 </div>
-  <br><br>
 
+<br><br>
 <!-- NAV -->
 <nav>
   <div class="nav-item" data-page="index.html">🛒 Vente rapide</div>
   <div class="nav-item" data-page="products.html">📦 Produits</div>
   <div class="nav-item" data-page="stats.html">📊 Stats</div>
-  <div class="nav-item" data-page="pages.html">🌐 Navigation</div>
-  <div class="nav-item active" data-page="expensess.html">Perte</div>
+  <div class="nav-item" data-page="pages.html">🌐 Navigation</div> 
+  <div class="nav-item active" data-page="losses.html">❌ Pertes</div>
 </nav>
 
 <script>
@@ -293,13 +318,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 </script>
-
- <script>
-document.querySelectorAll('nav .nav-item').forEach(item => {
-  item.addEventListener('click', () => location.href = item.dataset.page);
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('nav .nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      location.href = item.dataset.page;
+    });
+  });
 });
- </script>
-
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
@@ -432,10 +459,10 @@ function getFiltered() {
       e.category === filterCategory.value;
 
     const date = e.createdAt?.toDate ? e.createdAt.toDate() : null;
-
-    const matchDate =
-      (!startDate.value || date >= new Date(startDate.value)) &&
-      (!endDate.value || date <= new Date(endDate.value));
+      
+      const matchDate =
+  (!startDate.value || (date && date >= new Date(startDate.value))) &&
+  (!endDate.value || (date && date <= new Date(endDate.value)));
 
     return matchSearch && matchCategory && matchDate;
   });
@@ -453,27 +480,45 @@ function render(page = 1) {
 
   pageData.forEach(item => {
     const div = document.createElement("div");
-    div.className = "expense-item";
+    div.classList.add("expense-item");
 
     const left = document.createElement("div");
 
     const title = document.createElement("strong");
     title.textContent = `${item.reason} (${item.genre})`;
-
+    
     const sub = document.createElement("small");
-    sub.textContent = item.category || "—";
+
+let displayAmount = 0;
+
+if (item.genre === "debt") {
+  sub.textContent = item.name || "unknown";
+  displayAmount = item.amount_remaining || 0;
+
+  if (item.DueDate && item.DueDate.toDate) {
+    const due = item.DueDate.toDate();
+    const now = new Date();
+    const days = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+
+    const dueText = document.createElement("div");
+    dueText.textContent = `⏳ ${days} jours`;
+    dueText.style.color = "red";
+    dueText.style.fontSize = "12px";
+
+    left.appendChild(dueText);
+  }
+
+} else {
+  sub.textContent = item.category || "—";
+  displayAmount = item.amount || 0;
+}
 
     left.appendChild(title);
     left.appendChild(sub);
 
     const amount = document.createElement("div");
 
-    let displayAmount = 0;
-    if (item.genre === "debt") {
-      displayAmount = item.amount_remaining;
-    } else {
-      displayAmount = item.amount;
-    }
+    
 
     amount.textContent = `${displayAmount || 0} FC`;
     amount.style.fontWeight = "bold";
@@ -582,6 +627,15 @@ btnDebt.addEventListener("click", async () => {
   const total = Number(document.getElementById("debtAmount").value);
   const paid = Number(document.getElementById("debtPayed").value);
   const note = document.getElementById("debtNote").value;
+  
+  const phone = document.getElementById("debtPhone").value;
+  
+  const dueDateInput = document.getElementById("debtDueDate").value;
+
+let dueTimestamp = null;
+if (dueDateInput) {
+  dueTimestamp = Timestamp.fromDate(new Date(dueDateInput));
+}
 
   if (!name || isNaN(total) || total <= 0) {
     return alert("Champs obligatoires");
@@ -593,8 +647,11 @@ btnDebt.addEventListener("click", async () => {
   await addDoc(collection(db, "expensess"), {
     genre: "debt",
     reason: `${type} debt`,
-    category: "debt",
-
+    name: name,
+    category: type,
+    
+    phone: phone || "",
+    DueDate: dueTimestamp,
     amount_total: total,
     amount_paid: safePaid,
     amount_remaining: remaining,
@@ -804,4 +861,5 @@ onAuthStateChanged(auth, async (user) => {
 </script>
 
 </body>
-  </html>
+</html>
+     
