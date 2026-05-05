@@ -75,6 +75,8 @@
       z-index: 0;
     }
 
+    #splash{position:fixed;inset:0;background:#0B3D2E url(home.png) center/cover;z-index:9999}
+
     .product-content {
       position: relative;
       z-index: 1;
@@ -231,7 +233,7 @@
   <h3>ES Shop</h3>
   <div class="status">● Online</div>
 </header>
-
+<div id="splash"></div>
 <div class="search-bar">
   <input type="text" placeholder="Rechercher un produit..." id="searchInput">
 </div>
@@ -275,6 +277,10 @@
   <div class="nav-item" data-page="losses.html">❌ Pertes</div>
 </nav>
 
+<script>
+  window.addEventListener('load', () => setTimeout(() => splash.remove(), 1500));
+</script>
+  
 <script>
   // NAV
   document.querySelectorAll('nav .nav-item').forEach(item => {
