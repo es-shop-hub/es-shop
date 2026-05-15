@@ -461,7 +461,7 @@ sales.forEach(s => {
 
   const stockTotal = stockIn - stockOut;
 
-  const netReal = totalSales - totalExpenses - totalLosses;
+  const netReal = totalProfit - totalExpenses - totalLosses;
 
   el("stockValue").textContent = stockValue + " FC";
   el("sales").textContent = totalSales + " FC";
